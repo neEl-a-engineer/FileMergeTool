@@ -10,6 +10,7 @@ from file_merge_tool.domain.artifact import (
 )
 from file_merge_tool.domain.config import MergeRequest
 from file_merge_tool.domain.result import MergeResult
+from file_merge_tool.application.output_files import file_list_output_path
 from file_merge_tool.scanning.walker import walk_tree
 from file_merge_tool.writers.json_writer import write_json
 
@@ -56,7 +57,7 @@ def create_file_list(request: MergeRequest) -> MergeResult:
         "warnings": [],
     }
 
-    output_path = request.output_dir / request.output_name
+    output_path = file_list_output_path(request, default_name="file-list")
     write_json(output_path, payload)
     return MergeResult(
         output_paths=(output_path,),

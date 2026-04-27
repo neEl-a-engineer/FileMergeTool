@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+
+if [ -f "$repo_root/40_scripts/check-sensitive-data.ps1" ]; then
+  scan_script="$repo_root/40_scripts/check-sensitive-data.ps1"
+elif [ -f "$repo_root/scripts/check-sensitive-data.ps1" ]; then
+  scan_script="$repo_root/scripts/check-sensitive-data.ps1"
+else
+  echo "Sensitive scan script not found in 40_scripts/ or scripts/." >&2
+  exit 1
+fi
+
+if command -v cygpath >/dev/null 2>&1; then
+  repo_root_native="$(cygpath -w "$repo_root")"
+  scan_script_native="$(cygpath -w "$scan_script")"
+else
+  repo_root_native="$repo_root"
+  scan_script_native="$scan_script"
+fi
+
+if command -v pwsh >/dev/null 2>&1; then
+  powershell_cmd="pwsh"
+elif command -v powershell.exe >/dev/null 2>&1; then
+  powershell_cmd="powershell.exe"
+elif command -v powershell >/dev/null 2>&1; then
+  powershell_cmd="powershell"
+else
+  echo "PowerShell command not found. Cannot run sensitive scan." >&2
+  exit 1
+fi
+
+"$powershell_cmd" -NoProfile -ExecutionPolicy Bypass -File "$scan_script_native" -Mode push -ProjectRoot "$repo_root_native"

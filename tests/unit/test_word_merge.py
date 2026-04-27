@@ -19,8 +19,12 @@ def test_word_merge_splits_normal_and_sensitive_outputs(
 
     def fake_extract(path: Path) -> ExtractedWord:
         if path.name == "leading-marker.docm":
-            return ExtractedWord(page_count=3, leading_text="\u6a5f\u5bc6 minutes")
-        return ExtractedWord(page_count=2, leading_text="open minutes")
+            return ExtractedWord(
+                page_count=3,
+                leading_text="\u6a5f\u5bc6 minutes",
+                lines=["\u6a5f\u5bc6 minutes", "line 2"],
+            )
+        return ExtractedWord(page_count=2, leading_text="open minutes", lines=["open minutes"])
 
     written: list[tuple[Path, list[str], list[dict[str, object]]]] = []
 
@@ -45,9 +49,13 @@ def test_word_merge_splits_normal_and_sensitive_outputs(
     result = merge_word(request)
 
     assert result.item_count == 2
-    assert [path.name for path in result.output_paths] == [
-        "merged.docx",
-        "merged_\u6a5f\u5bc6.docx",
+    assert [path.name for path in result.output_paths[:2]] == [
+        "merged_\u30de\u30fc\u30b8.docx",
+        "\u6a5f\u5bc6_merged_\u30de\u30fc\u30b8.docx",
+    ]
+    assert [path.name for path in result.output_paths[2:]] == [
+        "merged_\u30de\u30fc\u30b8.json",
+        "\u6a5f\u5bc6_merged_\u30de\u30fc\u30b8.json",
     ]
     assert written[0][2][0]["relative_path"] == "normal.docx"
     assert written[1][2][0]["relative_path"] == "leading-marker.docm"

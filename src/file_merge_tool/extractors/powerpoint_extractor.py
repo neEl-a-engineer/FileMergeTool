@@ -25,6 +25,7 @@ POWERPOINT_EXTENSIONS = frozenset(
 class ExtractedPowerPoint:
     slide_count: int
     first_slide_text: str
+    slides: list[dict[str, object]]
 
 
 def is_powerpoint_file(path: Path) -> bool:
@@ -36,4 +37,5 @@ def extract_powerpoint_file(path: Path) -> ExtractedPowerPoint:
     return ExtractedPowerPoint(
         slide_count=info["slide_count"],
         first_slide_text=info["first_slide_text"],
+        slides=info["slides"],
     )

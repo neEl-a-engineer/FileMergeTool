@@ -19,8 +19,16 @@ def test_powerpoint_merge_splits_normal_and_sensitive_outputs(
 
     def fake_extract(path: Path) -> ExtractedPowerPoint:
         if path.name == "first-slide-marker.pptx":
-            return ExtractedPowerPoint(slide_count=3, first_slide_text="\u6a5f\u5bc6 agenda")
-        return ExtractedPowerPoint(slide_count=2, first_slide_text="open agenda")
+            return ExtractedPowerPoint(
+                slide_count=3,
+                first_slide_text="\u6a5f\u5bc6 agenda",
+                slides=[{"slide_number": 1, "text_lines": ["\u6a5f\u5bc6 agenda"]}],
+            )
+        return ExtractedPowerPoint(
+            slide_count=2,
+            first_slide_text="open agenda",
+            slides=[{"slide_number": 1, "text_lines": ["open agenda"]}],
+        )
 
     written: list[tuple[Path, list[str], list[dict[str, object]]]] = []
 
@@ -45,9 +53,13 @@ def test_powerpoint_merge_splits_normal_and_sensitive_outputs(
     result = merge_powerpoint(request)
 
     assert result.item_count == 2
-    assert [path.name for path in result.output_paths] == [
-        "merged.pptx",
-        "merged_\u6a5f\u5bc6.pptx",
+    assert [path.name for path in result.output_paths[:2]] == [
+        "merged_\u30de\u30fc\u30b8.pptx",
+        "\u6a5f\u5bc6_merged_\u30de\u30fc\u30b8.pptx",
+    ]
+    assert [path.name for path in result.output_paths[2:]] == [
+        "merged_\u30de\u30fc\u30b8.json",
+        "\u6a5f\u5bc6_merged_\u30de\u30fc\u30b8.json",
     ]
     assert len(written[0][2]) == 1
     assert written[0][2][0]["relative_path"] == "normal.pptx"

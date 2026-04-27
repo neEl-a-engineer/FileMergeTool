@@ -9,6 +9,7 @@ from file_merge_tool.domain.artifact import (
     build_artifact_header,
     model_to_dict,
 )
+from file_merge_tool.application.output_files import merge_output_path
 from file_merge_tool.domain.config import MergeRequest
 from file_merge_tool.domain.result import MergeResult
 from file_merge_tool.extractors.text_extractor import extract_text
@@ -119,7 +120,11 @@ def merge_text(request: MergeRequest) -> MergeResult:
         "warnings": [model_to_dict(item, exclude_none=True) for item in warnings],
     }
 
-    output_path = request.output_dir / request.output_name
+    output_path = merge_output_path(
+        request,
+        extension=".json",
+        default_name="text-merge",
+    )
     write_json(output_path, payload)
     return MergeResult(
         output_paths=(output_path,),

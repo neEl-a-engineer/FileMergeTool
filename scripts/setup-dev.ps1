@@ -33,9 +33,12 @@ Write-Host "Upgrading pip"
 Write-Host "Installing $InstallSpec"
 & $VenvPython -m pip install -e $InstallSpec
 
+& (Join-Path $PSScriptRoot "install-git-hooks.ps1") -ProjectRoot $ProjectRoot -SkipIfNotGitRepo
+
 Write-Host ""
 Write-Host "Setup complete."
 Write-Host "Python: $VenvPython"
 Write-Host "Run dev server: .\scripts\run-dev.ps1"
 Write-Host "Run tests: .\scripts\run-tests.ps1"
+Write-Host "Git hooks: .\.githooks (installed via core.hooksPath)"
 

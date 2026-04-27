@@ -6,6 +6,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from file_merge_tool.domain.output_naming import normalize_output_folder_name
+from file_merge_tool.infrastructure.output_metadata import build_output_record
+
 
 HISTORY_LIMIT = 50
 
@@ -20,9 +23,16 @@ def history_root(project_root: Path | None = None) -> Path:
     return workspace_root(project_root) / "history"
 
 
-def make_history_dir(kind: str, job_id: str, project_root: Path | None = None) -> Path:
-    timestamp = datetime.now(timezone.utc).astimezone().strftime("%Y%m%d-%H%M%S")
-    path = history_root(project_root) / kind / f"{timestamp}_{job_id[:8]}"
+def make_history_dir(
+    kind: str,
+    job_id: str,
+    output_folder_name: str,
+    project_root: Path | None = None,
+) -> Path:
+    del kind, job_id
+    timestamp = datetime.now(timezone.utc).astimezone().strftime("%Y%m%d_%H%M%S")
+    folder_name = normalize_output_folder_name(output_folder_name, default_name="output")
+    path = history_root(project_root) / f"{timestamp}_{folder_name}"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -45,9 +55,13 @@ def write_manifest(run_dir: Path, manifest: dict[str, Any]) -> Path:
 
 def read_manifest(path: Path) -> dict[str, Any] | None:
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        manifest = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+    outputs = manifest.get("outputs")
+    if isinstance(outputs, list):
+        manifest["outputs"] = [_normalize_output_entry(item) for item in outputs]
+    return manifest
 
 
 def list_history(
@@ -60,7 +74,8 @@ def list_history(
         return []
 
     records: list[dict[str, Any]] = []
-    for path in root.glob("*/*/manifest.json"):
+    manifest_paths = list(root.glob("*/manifest.json")) + list(root.glob("*/*/manifest.json"))
+    for path in manifest_paths:
         manifest = read_manifest(path)
         if manifest is None:
             continue
@@ -99,6 +114,20 @@ def trim_history(limit: int = HISTORY_LIMIT, project_root: Path | None = None) -
         if not run_dir_value:
             continue
         run_dir = Path(run_dir_value)
-        if run_dir.exists() and run_dir.parent.parent == history_root(project_root):
+        if not run_dir.exists():
+            continue
+        root = history_root(project_root)
+        if run_dir.parent == root or run_dir.parent.parent == root:
             shutil.rmtree(run_dir, ignore_errors=True)
     rebuild_history_index(project_root)
+
+
+def _normalize_output_entry(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    path_value = value.get("path")
+    if not isinstance(path_value, str) or not path_value:
+        return dict(value)
+    normalized = build_output_record(Path(path_value))
+    normalized.update({key: item for key, item in value.items() if key not in normalized})
+    return normalized

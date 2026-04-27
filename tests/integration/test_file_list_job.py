@@ -59,8 +59,8 @@ def test_file_list_uses_files_first_depth_first_order(tmp_path: Path) -> None:
         exclude=ExcludeConfig(),
     )
 
-    create_file_list(request)
-    output = (tmp_path / "out" / "file-list.json").read_text(encoding="utf-8")
+    result = create_file_list(request)
+    output = result.output_paths[0].read_text(encoding="utf-8")
 
     assert output.index('"relative_path": "a.txt"') < output.index('"relative_path": "b.txt"')
     assert output.index('"relative_path": "b.txt"') < output.index('"relative_path": "child"')
@@ -86,8 +86,8 @@ def test_file_list_records_symlink_without_following(tmp_path: Path) -> None:
         exclude=ExcludeConfig(),
     )
 
-    create_file_list(request)
-    output = (tmp_path / "out" / "file-list.json").read_text(encoding="utf-8")
+    result = create_file_list(request)
+    output = result.output_paths[0].read_text(encoding="utf-8")
 
     assert '"kind": "symlink"' in output
     assert '"excluded_reason": "symlink_not_followed"' in output

@@ -57,13 +57,9 @@
             <p class="eyebrow" data-i18n="savedEyebrow">Preset</p>
             <h2 data-i18n="savedTitle">保存済み設定</h2>
           </div>
-          <label class="field">
-            <span data-i18n="savedSelect">設定一覧</span>
-            <select id="saved-setting-select"></select>
-          </label>
+          <p class="saved-summary" id="saved-settings-count">0</p>
           <div class="button-row">
-            <button class="secondary-button" id="load-setting" type="button" data-i18n="loadSetting">読込</button>
-            <button class="secondary-button" id="delete-setting" type="button" data-i18n="deleteSetting">削除</button>
+            <button class="secondary-button" id="open-saved-settings" type="button" data-i18n="savedSelect">設定一覧</button>
           </div>
         </aside>
 
@@ -82,11 +78,8 @@
                 <input id="setting-name" name="settingName" placeholder="default" />
               </label>
               <label class="field">
-                <span data-i18n="outputStem">出力ファイル名</span>
-                <span class="suffix-input">
-                  <input id="output-stem" name="outputStem" value="file-list" />
-                  <span id="output-extension">.json</span>
-                </span>
+                <span data-i18n="outputFolderName">出力フォルダ名</span>
+                <input id="output-folder-name" name="outputFolderName" value="file-list" />
               </label>
             </div>
 
@@ -111,7 +104,7 @@
             </section>
 
             <label class="field">
-              <span data-i18n="outputDir">出力先フォルダ</span>
+              <span data-i18n="historyRoot">履歴保存ルート</span>
               <input id="output-dir" name="outputDir" value="80_workspace\history" readonly />
             </label>
 
@@ -175,6 +168,9 @@
           </fieldset>
 
           <div class="action-bar">
+            <button class="secondary-button" id="restart-server" type="button" data-i18n="restartServer">
+              サーバーを再起動
+            </button>
             <button class="primary-button" id="save-global-settings" type="button" data-i18n="saveGlobalSettings">
               全体設定を保存
             </button>
@@ -192,6 +188,13 @@
             </button>
           </div>
           <div id="history-list" class="history-list"></div>
+          <section id="history-preview-panel" class="history-preview is-hidden">
+            <div class="section-heading history-preview-heading">
+              <p class="eyebrow">Preview</p>
+              <h2 id="history-preview-title">JSON Preview</h2>
+            </div>
+            <pre id="history-preview-content"></pre>
+          </section>
         </section>
 
         <section class="result-panel">
@@ -199,9 +202,59 @@
             <p class="eyebrow">Console</p>
             <h2 data-i18n="jobResult">実行結果</h2>
           </div>
+          <section class="job-status-card is-idle" id="job-status-card" aria-live="polite">
+            <div class="job-status-head">
+              <p class="job-status-caption" data-i18n="jobStatus">実行ステータス</p>
+              <p class="job-status-value" id="job-status-value">待機中</p>
+            </div>
+            <p class="job-status-message" id="job-status-message">No job yet.</p>
+            <dl class="job-status-summary" id="job-status-summary">
+              <div>
+                <dt data-i18n="summaryItems">対象</dt>
+                <dd id="job-summary-items">-</dd>
+              </div>
+              <div>
+                <dt data-i18n="summarySkipped">スキップ</dt>
+                <dd id="job-summary-skipped">-</dd>
+              </div>
+              <div>
+                <dt data-i18n="summaryWarnings">警告</dt>
+                <dd id="job-summary-warnings">-</dd>
+              </div>
+              <div>
+                <dt data-i18n="summaryOutputs">出力</dt>
+                <dd id="job-summary-outputs">-</dd>
+              </div>
+            </dl>
+          </section>
           <pre id="job-output">No job yet.</pre>
         </section>
       </section>
+      <dialog class="app-dialog" id="saved-settings-dialog">
+        <div class="dialog-shell">
+          <div class="section-heading dialog-heading">
+            <p class="eyebrow" data-i18n="savedEyebrow">Preset</p>
+            <h2 data-i18n="savedTitle">保存済み設定</h2>
+          </div>
+          <div class="saved-settings-list" id="saved-settings-list"></div>
+          <div class="action-bar dialog-actions">
+            <button class="secondary-button" id="close-saved-settings" type="button" data-i18n="closeDialog">閉じる</button>
+          </div>
+        </div>
+      </dialog>
+      <dialog class="app-dialog app-dialog-confirm" id="confirm-delete-dialog">
+        <div class="dialog-shell dialog-shell-compact">
+          <div class="section-heading dialog-heading">
+            <p class="eyebrow" data-i18n="deleteSetting">削除</p>
+            <h2 data-i18n="deleteConfirmTitle">設定を削除</h2>
+          </div>
+          <p class="confirm-message" id="confirm-delete-message"></p>
+          <div class="action-bar dialog-actions">
+            <button class="secondary-button" id="confirm-delete-cancel" type="button" data-i18n="cancelDelete">キャンセル</button>
+            <button class="primary-button" id="confirm-delete-accept" type="button" data-i18n="confirmDelete">削除する</button>
+          </div>
+        </div>
+      </dialog>
     </main>
     <script src="/static/app.js"></script>
   </body>

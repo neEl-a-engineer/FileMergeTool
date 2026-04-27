@@ -10,15 +10,13 @@ from file_merge_tool.domain.artifact import (
     build_artifact_header,
     model_to_dict,
 )
+from file_merge_tool.application.output_files import merge_output_path
 from file_merge_tool.domain.config import MergeRequest
 from file_merge_tool.domain.result import MergeResult
 from file_merge_tool.domain.sensitivity import SENSITIVE_MARKERS
 from file_merge_tool.extractors.msg_extractor import extract_msg_file, is_msg_file
 from file_merge_tool.scanning.walker import walk_tree
 from file_merge_tool.writers.json_writer import write_json
-
-
-SENSITIVE_SUFFIX = "_\u6a5f\u5bc6"
 
 
 def merge_mail(request: MergeRequest) -> MergeResult:
@@ -128,7 +126,11 @@ def merge_mail(request: MergeRequest) -> MergeResult:
     output_paths = (
         _write_json(
             request=request,
-            output_path=request.output_dir / f"{output_stem}.json",
+            output_path=merge_output_path(
+                request,
+                extension=".json",
+                default_name=output_stem,
+            ),
             classification="normal",
             items=normal_items,
             scanned_items=scanned_items,
@@ -139,7 +141,12 @@ def merge_mail(request: MergeRequest) -> MergeResult:
         ),
         _write_json(
             request=request,
-            output_path=request.output_dir / f"{output_stem}{SENSITIVE_SUFFIX}.json",
+            output_path=merge_output_path(
+                request,
+                extension=".json",
+                default_name=output_stem,
+                classification="sensitive",
+            ),
             classification="sensitive",
             items=sensitive_items,
             scanned_items=scanned_items,
@@ -196,6 +203,8 @@ def _write_json(
 
 
 def _output_stem(request: MergeRequest) -> str:
+    if request.output_folder_name:
+        return request.output_folder_name
     if request.output_stem:
         return request.output_stem
     return Path(request.output_name).stem or "mail-merge"

@@ -1,0 +1,163 @@
+{
+  "_comment_global_skip_paths": "all modes: matching paths are skipped from path-based checks and from file content scanning",
+  "global_skip_paths": [
+    ".git/",
+    ".venv/",
+    ".pytest_cache/",
+    "node_modules/",
+    "build/",
+    "dist/",
+    "80_workspace/outputs/",
+    "80_workspace/temp/",
+    "80_workspace/history/",
+    "80_workspace/settings/"
+  ],
+  "_comment_content_skip_extensions": "all modes: matching extensions are not opened for line-by-line content scanning; this does not block push by itself",
+  "content_skip_extensions": [
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".bmp",
+    ".ico",
+    ".pdf",
+    ".zip",
+    ".7z",
+    ".pptx",
+    ".docx",
+    ".xlsx",
+    ".msg",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".ttf",
+    ".woff",
+    ".woff2"
+  ],
+  "_comment_global_error_filenames": "all modes: matching file names become error findings even if file content is not scanned",
+  "global_error_filenames": [
+    ".env",
+    ".env.local",
+    ".env.development",
+    ".env.production",
+    "*.pem",
+    "*.pfx",
+    "*.key"
+  ],
+  "_comment_content_allow_paths": "all modes: matching paths skip line-based content pattern checks only; filename and push-extension checks still apply",
+  "content_allow_paths": [
+    {
+      "path": "30_tests/fixtures/",
+      "reason": "fixture data may intentionally contain sample markers"
+    },
+    {
+      "path": "tests/fixtures/",
+      "reason": "public export fixture data may intentionally contain sample markers"
+    }
+  ],
+  "_comment_content_allow_patterns": "all modes: matching lines skip content error and warning pattern checks",
+  "content_allow_patterns": [
+    {
+      "name": "example.com test data",
+      "pattern": "example\\.com",
+      "reason": "test and documentation examples"
+    },
+    {
+      "name": "project contact email",
+      "pattern": "neel_a_engineer@outlook\\.jp",
+      "reason": "intentional public contact address in README"
+    },
+    {
+      "name": "sample windows paths in docs",
+      "pattern": "D:\\\\(?:WebServer|Pictures|Docs|Mail|Slides)",
+      "reason": "intentional path examples in README and sample configs"
+    }
+  ],
+  "_comment_content_error_patterns": "all modes: matching lines become error findings and stop the script at the end",
+  "content_error_patterns": [
+    {
+      "name": "private key block",
+      "pattern": "-----BEGIN (?:RSA|DSA|EC|OPENSSH|PGP) PRIVATE KEY-----"
+    },
+    {
+      "name": "aws access key",
+      "pattern": "AKIA[0-9A-Z]{16}"
+    },
+    {
+      "name": "github token",
+      "pattern": "gh[pousr]_[A-Za-z0-9_]{20,}"
+    },
+    {
+      "name": "bearer token",
+      "pattern": "(?i)authorization\\s*[:=]\\s*bearer\\s+[A-Za-z0-9._\\-+/=]{12,}"
+    },
+    {
+      "name": "generic secret assignment",
+      "pattern": "(?i)\\b(api[_-]?key|access[_-]?token|token|secret|password)\\b\\s*[:=]\\s*['\\\"]?[^\\s'\\\"]{8,}"
+    }
+  ],
+  "_comment_content_warning_patterns": "all modes: matching lines become warning findings but do not fail unless the script is run with -FailOnWarning",
+  "content_warning_patterns": [
+    {
+      "name": "windows user path",
+      "pattern": "[A-Za-z]:\\\\Users\\\\"
+    },
+    {
+      "name": "generic email address",
+      "pattern": "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+    },
+    {
+      "name": "absolute windows path",
+      "pattern": "[A-Za-z]:\\\\(?:[^\\\\\\r\\n<>:\\\"|?*]+\\\\){1,}[^\\\\\\r\\n<>:\\\"|?*]*"
+    }
+  ],
+  "_comment_push": "push mode checks staged paths, staged added lines, configured extra paths, and unpushed history against the tracked upstream or the fallback range",
+  "push": {
+    "_comment_prefer_upstream_unpushed_range": "push mode: when true, inspect @{u}..HEAD first; if no upstream exists, fallback_history_range is used",
+    "prefer_upstream_unpushed_range": true,
+    "_comment_scan_additional_paths": "push mode: always scan these working-tree files or folders recursively in addition to staged and unpushed diffs",
+    "scan_additional_paths": [
+      "README.md",
+      "README.public.md",
+      "10_docs/",
+      "50_tools/public_bundle_assets/"
+    ],
+    "_comment_fallback_history_range": "push mode: history range used only when upstream tracking cannot be resolved",
+    "fallback_history_range": "HEAD~20..HEAD",
+    "_comment_blocked_extensions": "push mode: matching extensions are treated as errors when they appear in staged or unpushed changed paths",
+    "blocked_extensions": [
+      ".zip",
+      ".pdf",
+      ".doc",
+      ".docx",
+      ".docm",
+      ".xls",
+      ".xlsx",
+      ".xlsm",
+      ".ppt",
+      ".pptx",
+      ".pptm"
+    ],
+    "_comment_blocked_extension_allow_paths": "push mode: path exceptions for blocked_extensions only; these do not affect content pattern scanning",
+    "blocked_extension_allow_paths": [
+      {
+        "path": "80_workspace/public_release/*.zip",
+        "reason": "optional public export bundles stay local and are gitignored by default"
+      }
+    ]
+  },
+  "_comment_release": "release mode recursively scans the configured export targets for filename risks and text-content patterns",
+  "release": {
+    "_comment_scan_targets": "release mode: recursively scan these folders or files",
+    "scan_targets": [
+      "80_workspace/public_release/"
+    ]
+  },
+  "_comment_history": "history mode scans git patch history instead of the working tree",
+  "history": {
+    "_comment_scan_range": "history mode: git log range to inspect when -HistoryRange is not passed",
+    "scan_range": "--all"
+  }
+}

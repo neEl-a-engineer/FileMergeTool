@@ -26,6 +26,7 @@ EXCEL_EXTENSIONS = frozenset(
 class ExtractedExcel:
     sheet_count: int
     first_sheet_text: str
+    sheets: list[dict[str, object]]
 
 
 def is_excel_file(path: Path) -> bool:
@@ -37,4 +38,5 @@ def extract_excel_file(path: Path) -> ExtractedExcel:
     return ExtractedExcel(
         sheet_count=info["sheet_count"],
         first_sheet_text=info["first_sheet_text"],
+        sheets=info["sheets"],
     )

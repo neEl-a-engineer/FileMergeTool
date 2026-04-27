@@ -12,6 +12,7 @@ class JobCreateRequest(BaseModel):
     root_path: Path
     output_dir: Path | None = None
     output_stem: str | None = None
+    output_folder_name: str | None = None
     output_name: str | None = None
     setting_name: str | None = None
     image_output_formats: list[str] = Field(default_factory=list)

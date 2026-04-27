@@ -28,12 +28,15 @@ def test_pdf_merge_writes_normal_and_sensitive_pdfs(tmp_path: Path) -> None:
     result = merge_pdf(request)
 
     assert result.item_count == 2
-    assert len(result.output_paths) == 2
+    assert len(result.output_paths) == 4
     normal_reader = PdfReader(str(result.output_paths[0]))
     sensitive_reader = PdfReader(str(result.output_paths[1]))
     assert len(normal_reader.pages) == 3
     assert len(sensitive_reader.pages) == 3
-    assert result.output_paths[1].name == "merged_\u6a5f\u5bc6.pdf"
+    assert result.output_paths[0].name == "merged_\u30de\u30fc\u30b8.pdf"
+    assert result.output_paths[1].name == "\u6a5f\u5bc6_merged_\u30de\u30fc\u30b8.pdf"
+    assert result.output_paths[2].name == "merged_\u30de\u30fc\u30b8.json"
+    assert result.output_paths[3].name == "\u6a5f\u5bc6_merged_\u30de\u30fc\u30b8.json"
 
 
 def _write_pdf(path: Path, text: str) -> None:

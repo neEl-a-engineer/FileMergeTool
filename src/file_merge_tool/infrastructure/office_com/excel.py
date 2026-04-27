@@ -36,11 +36,27 @@ def read_excel_info(path: Path) -> dict[str, Any]:
         try:
             sheet_count = int(workbook.Worksheets.Count)
             first_sheet_text = ""
+            sheets: list[dict[str, Any]] = []
             if sheet_count:
-                first_sheet_text = _worksheet_text(workbook.Worksheets(1))
+                for sheet_index in range(1, sheet_count + 1):
+                    worksheet = workbook.Worksheets(sheet_index)
+                    formula_rows = _rows_from_matrix(_used_range_value(worksheet, "Formula"))
+                    value_rows = _rows_from_matrix(_used_range_value(worksheet, "Value"))
+                    if sheet_index == 1:
+                        first_sheet_text = _rows_to_text(value_rows)
+                    sheets.append(
+                        {
+                            "sheet_name": str(worksheet.Name),
+                            "sheet_order": sheet_index,
+                            "formula_rows": formula_rows,
+                            "value_rows": value_rows,
+                            "used_range": _used_range_info(formula_rows or value_rows),
+                        }
+                    )
             return {
                 "sheet_count": sheet_count,
                 "first_sheet_text": first_sheet_text,
+                "sheets": sheets,
             }
         finally:
             workbook.Close(SaveChanges=False)
@@ -51,6 +67,7 @@ def create_excel_merge(
     *,
     header_lines: list[str],
     sources: list[dict[str, Any]],
+    cell_mode: str = "formula",
 ) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     with ExcelApp() as session:
@@ -80,6 +97,8 @@ def create_excel_merge(
                             target,
                             f"{index:03d}_{source_sheet.Name}",
                         )
+                        if cell_mode == "value":
+                            _freeze_sheet_values(copied)
                 finally:
                     source_book.Close(SaveChanges=False)
 
@@ -89,13 +108,65 @@ def create_excel_merge(
     return path
 
 
-def _worksheet_text(sheet: object) -> str:
+def _used_range_value(sheet: object, attribute: str) -> object:
     try:
-        values = sheet.UsedRange.Value
+        return getattr(sheet.UsedRange, attribute)
     except Exception:  # noqa: BLE001
+        return None
+
+
+def _rows_to_text(rows: list[list[str]]) -> str:
+    flattened: list[str] = []
+    for row in rows:
+        for value in row:
+            if value.strip():
+                flattened.append(value.strip())
+            if len(flattened) >= 200:
+                return "\n".join(flattened)
+    return "\n".join(flattened)
+
+
+def _rows_from_matrix(value: object) -> list[list[str]]:
+    matrix = _matrix(value)
+    return [[_stringify(cell) for cell in row] for row in matrix]
+
+
+def _matrix(value: object) -> list[list[object]]:
+    if value is None:
+        return []
+    if isinstance(value, (tuple, list)):
+        if not value:
+            return []
+        if any(isinstance(item, (tuple, list)) for item in value):
+            return [
+                [cell for cell in _row_values(row)]
+                for row in value
+            ]
+        return [[item for item in value]]
+    return [[value]]
+
+
+def _row_values(value: object) -> list[object]:
+    if isinstance(value, (tuple, list)):
+        return [item for item in value]
+    return [value]
+
+
+def _stringify(value: object) -> str:
+    if value is None:
         return ""
-    flattened = list(_flatten(values))
-    return "\n".join(str(value).strip() for value in flattened[:200] if str(value).strip())
+    return str(value)
+
+
+def _used_range_info(rows: list[list[str]]) -> dict[str, int]:
+    row_count = len(rows)
+    column_count = max((len(row) for row in rows), default=0)
+    return {
+        "start_row": 1,
+        "start_column": 1,
+        "row_count": row_count,
+        "column_count": column_count,
+    }
 
 
 def _flatten(value: object):
@@ -106,6 +177,11 @@ def _flatten(value: object):
             yield from _flatten(item)
         return
     yield value
+
+
+def _freeze_sheet_values(sheet: object) -> None:
+    used = sheet.UsedRange
+    used.Value = used.Value
 
 
 def _reset_to_single_sheet(workbook: object) -> None:

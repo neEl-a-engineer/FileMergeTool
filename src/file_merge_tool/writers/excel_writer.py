@@ -11,5 +11,6 @@ def write_excel_merge(
     *,
     header_lines: list[str],
     sources: list[dict[str, Any]],
+    cell_mode: str = "formula",
 ) -> Path:
-    return create_excel_merge(path, header_lines=header_lines, sources=sources)
+    return create_excel_merge(path, header_lines=header_lines, sources=sources, cell_mode=cell_mode)

@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from file_merge_tool.api.routes import downloads, health, history, jobs, presets, settings
+from file_merge_tool.api.routes import downloads, health, history, jobs, presets, settings, system
 
 
 def create_app() -> FastAPI:
@@ -15,6 +15,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs.router)
     app.include_router(presets.router)
     app.include_router(settings.router)
+    app.include_router(system.router)
     app.include_router(history.router)
     app.include_router(downloads.router)
 

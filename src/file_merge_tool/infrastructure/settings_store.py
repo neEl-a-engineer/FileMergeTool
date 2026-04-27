@@ -38,8 +38,9 @@ def save_preset(preset: dict[str, Any], project_root: Path | None = None) -> lis
     name = str(preset.get("name", "")).strip()
     if not name:
         raise ValueError("Preset name is required.")
-    presets = [item for item in load_presets(project_root) if item.get("name") != name]
-    presets.insert(0, {**preset, "name": name})
+    presets = load_presets(project_root)
+    unique_name = _next_preset_name(name, presets)
+    presets.insert(0, {**preset, "name": unique_name})
     _write_json(presets_path(project_root), presets)
     return presets
 
@@ -73,3 +74,17 @@ def _write_json(path: Path, payload: Any) -> None:
         encoding="utf-8",
         newline="\n",
     )
+
+
+def _next_preset_name(requested_name: str, presets: list[dict[str, Any]]) -> str:
+    existing_names = {
+        str(item.get("name", "")).strip()
+        for item in presets
+        if str(item.get("name", "")).strip()
+    }
+    if requested_name not in existing_names:
+        return requested_name
+    index = 2
+    while f"{requested_name} ({index})" in existing_names:
+        index += 1
+    return f"{requested_name} ({index})"

@@ -41,6 +41,7 @@ class MergeRequest:
     output_dir: Path
     output_name: str
     output_stem: str | None = None
+    output_folder_name: str | None = None
     exclude: ExcludeConfig = field(default_factory=ExcludeConfig)
     job_id: str | None = None
     kind: str | None = None

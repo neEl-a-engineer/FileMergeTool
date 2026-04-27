@@ -24,6 +24,7 @@ WORD_EXTENSIONS = frozenset(
 class ExtractedWord:
     page_count: int
     leading_text: str
+    lines: list[str]
 
 
 def is_word_file(path: Path) -> bool:
@@ -35,4 +36,5 @@ def extract_word_file(path: Path) -> ExtractedWord:
     return ExtractedWord(
         page_count=info["page_count"],
         leading_text=info["leading_text"],
+        lines=info["lines"],
     )

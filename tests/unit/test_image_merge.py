@@ -31,6 +31,8 @@ def test_image_merge_writes_normal_and_sensitive_html(tmp_path: Path) -> None:
     assert len(result.output_paths) == 2
     normal_html = result.output_paths[0].read_text(encoding="utf-8")
     sensitive_html = result.output_paths[1].read_text(encoding="utf-8")
+    assert result.output_paths[0].name == "images_\u30de\u30fc\u30b8.html"
+    assert result.output_paths[1].name == "\u6a5f\u5bc6_images_\u30de\u30fc\u30b8.html"
     assert "normal.png" in normal_html
     assert "secret_" not in normal_html
     assert "secret_" in sensitive_html
@@ -82,8 +84,8 @@ def test_image_merge_writes_powerpoint_outputs(tmp_path: Path) -> None:
 
     assert result.item_count == 2
     assert [path.name for path in result.output_paths] == [
-        "images.pptx",
-        "images_\u6a5f\u5bc6.pptx",
+        "images_\u30de\u30fc\u30b8.pptx",
+        "\u6a5f\u5bc6_images_\u30de\u30fc\u30b8.pptx",
     ]
     normal_deck = Presentation(result.output_paths[0])
     sensitive_deck = Presentation(result.output_paths[1])

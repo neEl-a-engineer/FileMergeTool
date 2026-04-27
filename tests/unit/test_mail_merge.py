@@ -52,8 +52,8 @@ def test_mail_merge_writes_normal_and_sensitive_json(
 
     assert result.item_count == 2
     assert [path.name for path in result.output_paths] == [
-        "mail.json",
-        "mail_\u6a5f\u5bc6.json",
+        "mail_\u30de\u30fc\u30b8.json",
+        "\u6a5f\u5bc6_mail_\u30de\u30fc\u30b8.json",
     ]
     normal = json.loads(result.output_paths[0].read_text(encoding="utf-8"))
     sensitive = json.loads(result.output_paths[1].read_text(encoding="utf-8"))

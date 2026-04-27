@@ -40,6 +40,7 @@ def read_word_info(path: Path) -> dict[str, Any]:
             return {
                 "page_count": int(document.ComputeStatistics(WD_STATISTIC_PAGES)),
                 "leading_text": text[:2000],
+                "lines": [line for line in text.splitlines()],
             }
         finally:
             document.Close(SaveChanges=False)

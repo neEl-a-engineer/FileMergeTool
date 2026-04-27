@@ -37,11 +37,22 @@ def read_powerpoint_info(path: Path) -> dict[str, Any]:
         try:
             slide_count = int(presentation.Slides.Count)
             first_slide_text = ""
+            slides: list[dict[str, Any]] = []
             if slide_count:
-                first_slide_text = _slide_text(presentation.Slides(1))
+                for slide_index in range(1, slide_count + 1):
+                    text_lines = _slide_text_lines(presentation.Slides(slide_index))
+                    if slide_index == 1:
+                        first_slide_text = "\n".join(text_lines)
+                    slides.append(
+                        {
+                            "slide_number": slide_index,
+                            "text_lines": text_lines,
+                        }
+                    )
             return {
                 "slide_count": slide_count,
                 "first_slide_text": first_slide_text,
+                "slides": slides,
             }
         finally:
             presentation.Close()
@@ -80,17 +91,17 @@ def create_powerpoint_merge(
     return path
 
 
-def _slide_text(slide: object) -> str:
+def _slide_text_lines(slide: object) -> list[str]:
     texts: list[str] = []
     for shape in slide.Shapes:
         try:
             if shape.HasTextFrame and shape.TextFrame.HasText:
                 text = str(shape.TextFrame.TextRange.Text).strip()
                 if text:
-                    texts.append(text)
+                    texts.extend(line for line in text.splitlines() if line.strip())
         except Exception:  # noqa: BLE001
             continue
-    return "\n".join(texts)
+    return texts
 
 
 def _source_lines(source: dict[str, Any]) -> list[str]:
