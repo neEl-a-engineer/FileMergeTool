@@ -3,5 +3,7 @@
   "root_path": "D:\\WebServer",
   "output_name": "merged.pdf",
   "exclude_dirs": [".git", ".venv", "__pycache__", "node_modules"],
-  "exclude_extensions": []
+  "selected_extensions": [".pdf"],
+  "additional_sensitive_markers": ["社外秘"],
+  "additional_sensitive_patterns": ["CONFIDENTIAL"]
 }

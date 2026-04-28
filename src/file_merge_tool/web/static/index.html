@@ -126,12 +126,40 @@
 
             <div class="field-row">
               <label class="field">
+                <span data-i18n="excludeDirPatterns">除外フォルダ正規表現</span>
+                <textarea id="exclude-dir-patterns" name="excludeDirPatterns" rows="4"></textarea>
+              </label>
+              <div class="field is-hidden" id="file-list-extension-spacer"></div>
+            </div>
+
+            <section class="field extension-selection" id="extension-selection-panel">
+              <span data-i18n="selectedExts">収集対象拡張子</span>
+              <div id="selected-extension-chips" class="extension-chip-list"></div>
+              <label class="field field-nested">
+                <span data-i18n="additionalExts">追加拡張子</span>
+                <input id="additional-exts" name="additionalExts" placeholder=".ini, .cfg" />
+              </label>
+            </section>
+
+            <div class="field-row">
+              <label class="field">
                 <span data-i18n="excludeFiles">除外ファイル名</span>
                 <textarea id="exclude-files" name="excludeFiles" rows="4">Thumbs.db, desktop.ini</textarea>
               </label>
               <label class="field">
+                <span data-i18n="excludeFilePatterns">除外ファイル名正規表現</span>
+                <textarea id="exclude-file-patterns" name="excludeFilePatterns" rows="4"></textarea>
+              </label>
+            </div>
+
+            <div class="field-row">
+              <label class="field">
                 <span data-i18n="additionalMarkers">追加機密分類判定文字列</span>
                 <textarea id="additional-markers" name="additionalMarkers" rows="4"></textarea>
+              </label>
+              <label class="field">
+                <span data-i18n="additionalMarkerPatterns">追加機密分類判定正規表現</span>
+                <textarea id="additional-marker-patterns" name="additionalMarkerPatterns" rows="4"></textarea>
               </label>
             </div>
 
@@ -151,6 +179,11 @@
           <label class="field">
             <span data-i18n="globalMarkers">全体機密分類判定文字列</span>
             <textarea id="global-markers" rows="5">機密, 極秘</textarea>
+          </label>
+
+          <label class="field">
+            <span data-i18n="globalMarkerPatterns">全体機密分類判定正規表現</span>
+            <textarea id="global-marker-patterns" rows="4"></textarea>
           </label>
 
           <fieldset class="segmented-field">

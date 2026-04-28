@@ -26,7 +26,9 @@ This repository is an early working implementation. The current slice supports:
 - Excel merge export as formula/value `.xlsx` plus formula/value JSON
 - Word merge export as `.docx` plus merge JSON
 - Per-run summary JSON output
-- Shared exclude rules for folders and file extensions
+- `file-list` keeps exclusion-based extension filtering
+- Merge jobs use selected extensions plus optional additional extensions
+- Exclude folder names, exclude file names, and sensitivity markers support regex rules
 - Shared output naming and history folder structure
 - FastAPI web server
 - CLI commands for every merge kind
@@ -82,12 +84,31 @@ outputs with the Windows machine's default desktop app when running locally.
 
 ```powershell
 .\scripts\run-cli.ps1 file-list D:\WebServer --output-name file-list.json
-.\scripts\run-cli.ps1 text-merge D:\WebServer --output-name text-merge.json --exclude-dir .git --exclude-ext .png
+.\scripts\run-cli.ps1 text-merge D:\WebServer --output-name text-merge.json --exclude-dir .git --select-ext .md --select-ext .txt --add-ext .cfg
+.\scripts\run-cli.ps1 text-merge D:\WebServer --output-name text-merge.json --exclude-file-regex '^~\$.*'
 .\scripts\run-cli.ps1 image-merge D:\Pictures --output-stem images --format html --format pptx
-.\scripts\run-cli.ps1 pdf-merge D:\Docs --output-stem merged
+.\scripts\run-cli.ps1 pdf-merge D:\Docs --output-stem merged --sensitive-regex 'CONFIDENTIAL'
 .\scripts\run-cli.ps1 mail-merge D:\Mail --output-stem mail-merge
 .\scripts\run-cli.ps1 powerpoint-merge D:\Slides --output-stem merged
 ```
+
+`file-list` still accepts `--exclude-ext`. All merge commands use
+`--select-ext` and `--add-ext` instead of extension exclusion.
+
+## Collection Rules
+
+- `file-list`:
+  - scans everything under the root path
+  - keeps `exclude_extensions` as an exclusion-based filter
+- Merge jobs:
+  - use `selected_extensions` as the main collection rule
+  - keep `additional_extensions` separate from the built-in selection list
+  - record files that were selected but not readable as skipped entries in the
+    run summary JSON
+- Literal matching is case-sensitive everywhere
+  - exclude folders and exclude files use exact-match literals
+  - sensitive markers use substring literals
+- Regex rules are also case-sensitive
 
 ## Development
 

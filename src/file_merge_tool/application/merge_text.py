@@ -11,9 +11,9 @@ from file_merge_tool.domain.artifact import (
 )
 from file_merge_tool.application.output_files import merge_output_path
 from file_merge_tool.domain.config import MergeRequest
-from file_merge_tool.domain.result import MergeResult
+from file_merge_tool.domain.extension_selection import is_extension_selected
+from file_merge_tool.domain.result import FileResult, MergeResult
 from file_merge_tool.extractors.text_extractor import extract_text
-from file_merge_tool.scanning.file_type import has_text_extension
 from file_merge_tool.scanning.walker import walk_tree
 from file_merge_tool.writers.json_writer import write_json
 
@@ -23,6 +23,7 @@ def merge_text(request: MergeRequest) -> MergeResult:
     files: list[dict[str, Any]] = []
     warnings: list[WarningItem] = []
     skipped_items: list[SkippedItem] = []
+    file_results: list[FileResult] = []
     skipped_count = 0
     error_skipped_count = 0
 
@@ -39,6 +40,15 @@ def merge_text(request: MergeRequest) -> MergeResult:
                         link_target=item.link_target,
                     )
                 )
+                file_results.append(
+                    FileResult(
+                        relative_path=item.relative_path,
+                        source_path=str(item.absolute_path),
+                        status="skipped",
+                        skip_reason=item.excluded_reason or "skipped",
+                        details="The path matched an exclusion rule during traversal.",
+                    )
+                )
             continue
         if item.excluded:
             skipped_count += 1
@@ -50,15 +60,38 @@ def merge_text(request: MergeRequest) -> MergeResult:
                     absolute_path=str(item.absolute_path),
                 )
             )
+            file_results.append(
+                FileResult(
+                    relative_path=item.relative_path,
+                    source_path=str(item.absolute_path),
+                    status="skipped",
+                    skip_reason=item.excluded_reason or "excluded",
+                    details="The file matched an exclusion rule.",
+                )
+            )
             continue
-        if not has_text_extension(item.absolute_path):
+        if not is_extension_selected(
+            item.absolute_path,
+            selected_extensions=request.selected_extensions,
+            additional_extensions=request.additional_extensions,
+            kind=request.kind or "text-merge",
+        ):
             skipped_count += 1
             skipped_items.append(
                 SkippedItem(
                     relative_path=item.relative_path,
                     kind=item.kind,
-                    reason="not_text_extension",
+                    reason="extension_not_selected",
                     absolute_path=str(item.absolute_path),
+                )
+            )
+            file_results.append(
+                FileResult(
+                    relative_path=item.relative_path,
+                    source_path=str(item.absolute_path),
+                    status="skipped",
+                    skip_reason="extension_not_selected",
+                    details="The file extension is not selected for this merge run.",
                 )
             )
             continue
@@ -74,6 +107,7 @@ def merge_text(request: MergeRequest) -> MergeResult:
                     kind=item.kind,
                     reason="read_error",
                     absolute_path=str(item.absolute_path),
+                    link_target=None,
                 )
             )
             warnings.append(
@@ -82,6 +116,17 @@ def merge_text(request: MergeRequest) -> MergeResult:
                     reason="read_error",
                     message="Skipped because the file could not be read.",
                     exception_type=exc.__class__.__name__,
+                )
+            )
+            file_results.append(
+                FileResult(
+                    relative_path=item.relative_path,
+                    source_path=str(item.absolute_path),
+                    status="error",
+                    skip_reason="read_error",
+                    exception_type=exc.__class__.__name__,
+                    message="The text file could not be read.",
+                    details=str(exc),
                 )
             )
             continue
@@ -99,6 +144,14 @@ def merge_text(request: MergeRequest) -> MergeResult:
                 },
                 "lines": extracted.lines,
             }
+        )
+        file_results.append(
+            FileResult(
+                relative_path=item.relative_path,
+                source_path=str(item.absolute_path),
+                status="merged",
+                classification="normal",
+            )
         )
 
     payload: dict[str, Any] = {
@@ -133,6 +186,7 @@ def merge_text(request: MergeRequest) -> MergeResult:
         excluded_count=sum(1 for item in scanned_items if item.excluded),
         error_skipped_count=error_skipped_count,
         warnings=tuple(f"{item.relative_path}: {item.reason}" for item in warnings),
+        file_results=tuple(file_results),
     )
 
 

@@ -12,7 +12,9 @@ from file_merge_tool.domain.artifact import (
     model_to_dict,
 )
 from file_merge_tool.domain.config import MergeRequest
-from file_merge_tool.domain.result import MergeResult
+from file_merge_tool.domain.extension_selection import effective_selected_extensions, is_extension_selected
+from file_merge_tool.domain.result import FileResult, MergeResult
+from file_merge_tool.domain.rule_matching import matched_literal_substrings, matched_regex_patterns
 from file_merge_tool.domain.sensitivity import SENSITIVE_MARKERS
 from file_merge_tool.extractors.pdf_extractor import extract_pdf_file, is_pdf_file
 from file_merge_tool.scanning.walker import walk_tree
@@ -26,6 +28,7 @@ def merge_pdf(request: MergeRequest) -> MergeResult:
     sensitive_sources: list[dict[str, Any]] = []
     skipped_items: list[SkippedItem] = []
     warnings: list[WarningItem] = []
+    file_results: list[FileResult] = []
     skipped_count = 0
     error_skipped_count = 0
     markers = _sensitivity_markers(request)
@@ -35,14 +38,59 @@ def merge_pdf(request: MergeRequest) -> MergeResult:
             if item.excluded:
                 skipped_count += 1
                 skipped_items.append(_skipped_item(item, item.excluded_reason or "skipped"))
+                file_results.append(
+                    FileResult(
+                        relative_path=item.relative_path,
+                        source_path=str(item.absolute_path),
+                        status="skipped",
+                        skip_reason=item.excluded_reason or "skipped",
+                        details="The path matched an exclusion rule during traversal.",
+                    )
+                )
             continue
         if item.excluded:
             skipped_count += 1
             skipped_items.append(_skipped_item(item, item.excluded_reason or "excluded"))
+            file_results.append(
+                FileResult(
+                    relative_path=item.relative_path,
+                    source_path=str(item.absolute_path),
+                    status="skipped",
+                    skip_reason=item.excluded_reason or "excluded",
+                    details="The file matched an exclusion rule.",
+                )
+            )
+            continue
+        if not is_extension_selected(
+            item.absolute_path,
+            selected_extensions=request.selected_extensions,
+            additional_extensions=request.additional_extensions,
+            kind=request.kind or "pdf-merge",
+        ):
+            skipped_count += 1
+            skipped_items.append(_skipped_item(item, "extension_not_selected"))
+            file_results.append(
+                FileResult(
+                    relative_path=item.relative_path,
+                    source_path=str(item.absolute_path),
+                    status="skipped",
+                    skip_reason="extension_not_selected",
+                    details="The file extension is not selected for this merge run.",
+                )
+            )
             continue
         if not is_pdf_file(item.absolute_path):
             skipped_count += 1
-            skipped_items.append(_skipped_item(item, "not_pdf_extension"))
+            skipped_items.append(_skipped_item(item, "reader_not_available"))
+            file_results.append(
+                FileResult(
+                    relative_path=item.relative_path,
+                    source_path=str(item.absolute_path),
+                    status="skipped",
+                    skip_reason="reader_not_available",
+                    details="The file extension is selected, but no PDF reader is available for it.",
+                )
+            )
             continue
 
         try:
@@ -59,11 +107,23 @@ def merge_pdf(request: MergeRequest) -> MergeResult:
                     exception_type=exc.__class__.__name__,
                 )
             )
+            file_results.append(
+                FileResult(
+                    relative_path=item.relative_path,
+                    source_path=str(item.absolute_path),
+                    status="error",
+                    skip_reason="read_error",
+                    exception_type=exc.__class__.__name__,
+                    message="The PDF file could not be read.",
+                    details=str(exc),
+                )
+            )
             continue
 
         matched_markers = _matched_markers(
-            f"{item.absolute_path.name}\n{extracted.first_page_text}",
+            [item.absolute_path.name, extracted.first_page_text],
             markers,
+            request.sensitivity_patterns,
         )
         source = {
             "absolute_path": str(item.absolute_path),
@@ -79,8 +139,24 @@ def merge_pdf(request: MergeRequest) -> MergeResult:
         }
         if matched_markers:
             sensitive_sources.append(source)
+            file_results.append(
+                FileResult(
+                    relative_path=item.relative_path,
+                    source_path=str(item.absolute_path),
+                    status="merged",
+                    classification="confidential",
+                )
+            )
         else:
             normal_sources.append(source)
+            file_results.append(
+                FileResult(
+                    relative_path=item.relative_path,
+                    source_path=str(item.absolute_path),
+                    status="merged",
+                    classification="normal",
+                )
+            )
 
     output_base = _output_base(request)
     normal_pdf = merge_output_path(request, extension=".pdf", default_name=output_base)
@@ -138,6 +214,7 @@ def merge_pdf(request: MergeRequest) -> MergeResult:
         excluded_count=sum(1 for item in scanned_items if item.excluded),
         error_skipped_count=error_skipped_count,
         warnings=tuple(f"{item.relative_path}: {item.reason}" for item in warnings),
+        file_results=tuple(file_results),
     )
 
 
@@ -198,10 +275,22 @@ def _header_lines(
         f"Setting name: {request.setting_name or ''}",
         "Traversal: files-first-depth-first-name-asc",
         "Follow symlinks: false",
+        f"Selected extensions: {', '.join(request.selected_extensions)}",
+        f"Additional extensions: {', '.join(request.additional_extensions)}",
+        "Effective extensions: "
+        + ", ".join(
+            effective_selected_extensions(
+                request.selected_extensions,
+                request.additional_extensions,
+                kind=request.kind,
+            )
+        ),
         f"Exclude folders: {', '.join(request.exclude.folder_names)}",
-        f"Exclude extensions: {', '.join(request.exclude.extensions)}",
+        f"Exclude folder regex: {', '.join(request.exclude.folder_patterns)}",
         f"Exclude file names: {', '.join(request.exclude.file_names)}",
+        f"Exclude file regex: {', '.join(request.exclude.file_patterns)}",
         f"Sensitivity markers: {', '.join(_sensitivity_markers(request))}",
+        f"Sensitivity regex: {', '.join(request.sensitivity_patterns)}",
         f"Source PDFs: {len(sources)}",
         f"Skipped items: {skipped_count}",
         f"Warnings: {len(warnings)}",
@@ -220,8 +309,15 @@ def _sensitivity_markers(request: MergeRequest) -> tuple[str, ...]:
     return tuple(dict.fromkeys((*SENSITIVE_MARKERS, *request.sensitivity_markers)))
 
 
-def _matched_markers(value: str, markers: tuple[str, ...]) -> list[str]:
-    return [marker for marker in markers if marker and marker in value]
+def _matched_markers(
+    haystacks: list[str],
+    markers: tuple[str, ...],
+    regex_patterns: tuple[str, ...],
+) -> list[str]:
+    return [
+        *matched_literal_substrings(haystacks, markers),
+        *matched_regex_patterns(haystacks, regex_patterns),
+    ]
 
 
 def _skipped_item(item: Any, reason: str) -> SkippedItem:

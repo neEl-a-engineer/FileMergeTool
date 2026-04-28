@@ -94,9 +94,22 @@ def _add_header_slide(
         ("Setting", header.get("setting_name") or ""),
         ("Traversal", (header.get("traversal") or {}).get("order", "")),
         ("Follow symlinks", str((header.get("traversal") or {}).get("follow_symlinks", False))),
+        (
+            "Selected extensions",
+            ", ".join((header.get("collection") or {}).get("selected_extensions", [])),
+        ),
+        (
+            "Additional extensions",
+            ", ".join((header.get("collection") or {}).get("additional_extensions", [])),
+        ),
+        (
+            "Effective extensions",
+            ", ".join((header.get("collection") or {}).get("effective_extensions", [])),
+        ),
         ("Exclude folders", ", ".join((header.get("exclude") or {}).get("folders", []))),
-        ("Exclude extensions", ", ".join((header.get("exclude") or {}).get("extensions", []))),
+        ("Exclude folder regex", ", ".join((header.get("exclude") or {}).get("folder_patterns", []))),
         ("Exclude files", ", ".join((header.get("exclude") or {}).get("file_names", []))),
+        ("Exclude file regex", ", ".join((header.get("exclude") or {}).get("file_patterns", []))),
         (
             "Sensitivity markers",
             ", ".join(
@@ -105,6 +118,10 @@ def _add_header_slide(
                     *((header.get("sensitivity") or {}).get("additional_markers", [])),
                 ]
             ),
+        ),
+        (
+            "Sensitivity regex",
+            ", ".join((header.get("sensitivity") or {}).get("regex_patterns", [])),
         ),
         ("Items", str(summary.get("item_count", 0))),
         ("Skipped", str(summary.get("skipped_count", 0))),

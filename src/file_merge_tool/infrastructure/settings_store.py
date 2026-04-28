@@ -54,12 +54,30 @@ def delete_preset(name: str, project_root: Path | None = None) -> list[dict[str,
 def load_global_settings(project_root: Path | None = None) -> dict[str, Any]:
     path = global_settings_path(project_root)
     if not path.exists():
-        return {"language": "ja", "globalMarkers": ["機密", "極秘"]}
+        return {
+            "language": "ja",
+            "globalMarkers": ["機密", "極秘"],
+            "globalMarkerPatterns": [],
+        }
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return {"language": "ja", "globalMarkers": ["機密", "極秘"]}
-    return value if isinstance(value, dict) else {"language": "ja", "globalMarkers": ["機密", "極秘"]}
+        return {
+            "language": "ja",
+            "globalMarkers": ["機密", "極秘"],
+            "globalMarkerPatterns": [],
+        }
+    if isinstance(value, dict):
+        return {
+            "language": value.get("language", "ja"),
+            "globalMarkers": value.get("globalMarkers", ["機密", "極秘"]),
+            "globalMarkerPatterns": value.get("globalMarkerPatterns", []),
+        }
+    return {
+        "language": "ja",
+        "globalMarkers": ["機密", "極秘"],
+        "globalMarkerPatterns": [],
+    }
 
 
 def save_global_settings(settings: dict[str, Any], project_root: Path | None = None) -> dict[str, Any]:

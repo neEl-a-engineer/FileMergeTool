@@ -7,7 +7,14 @@ import typer
 
 from file_merge_tool.application.output_files import summary_output_path
 from file_merge_tool.application.run_summary import build_run_summary_payload, write_run_summary
-from file_merge_tool.domain.config import ExcludeConfig, MergeRequest
+from file_merge_tool.domain.config import (
+    ExcludeConfig,
+    MergeRequest,
+    normalize_extension_values,
+    normalize_literal_values,
+    normalize_regex_values,
+)
+from file_merge_tool.domain.extension_selection import default_selected_extensions
 from file_merge_tool.domain.merge_job import MergeKind
 from file_merge_tool.infrastructure.output_metadata import build_output_record
 from file_merge_tool.infrastructure.filesystem import default_output_dir, ensure_safe_output_name
@@ -29,6 +36,11 @@ def _request(
     output_stem: str | None = None,
     output_folder_name: str | None = None,
     sensitive_marker: list[str] | None = None,
+    sensitive_pattern: list[str] | None = None,
+    selected_ext: list[str] | None = None,
+    additional_ext: list[str] | None = None,
+    exclude_dir_pattern: list[str] | None = None,
+    exclude_file_pattern: list[str] | None = None,
     image_format: list[str] | None = None,
 ) -> MergeRequest:
     return MergeRequest(
@@ -37,9 +49,20 @@ def _request(
         output_name=output_name,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
-        exclude=ExcludeConfig.from_iterables(exclude_dir, exclude_ext, exclude_file),
+        exclude=ExcludeConfig.from_iterables(
+            folder_names=exclude_dir,
+            extensions=exclude_ext,
+            file_names=exclude_file,
+            folder_patterns=exclude_dir_pattern,
+            file_patterns=exclude_file_pattern,
+        ),
+        selected_extensions=tuple(
+            normalize_extension_values(selected_ext) or default_selected_extensions(kind.value)
+        ),
+        additional_extensions=tuple(normalize_extension_values(additional_ext)),
         kind=kind.value,
-        sensitivity_markers=tuple(sensitive_marker or []),
+        sensitivity_markers=tuple(normalize_literal_values(sensitive_marker)),
+        sensitivity_patterns=tuple(normalize_regex_values(sensitive_pattern)),
         image_output_formats=tuple(image_format or []),
     )
 
@@ -81,6 +104,8 @@ def file_list(
     exclude_dir: Annotated[list[str], typer.Option("--exclude-dir")] = None,
     exclude_ext: Annotated[list[str], typer.Option("--exclude-ext")] = None,
     exclude_file: Annotated[list[str], typer.Option("--exclude-file")] = None,
+    exclude_dir_pattern: Annotated[list[str], typer.Option("--exclude-dir-regex")] = None,
+    exclude_file_pattern: Annotated[list[str], typer.Option("--exclude-file-regex")] = None,
 ) -> None:
     request = _request(
         root_path=root_path,
@@ -89,6 +114,8 @@ def file_list(
         exclude_dir=exclude_dir or [],
         exclude_ext=exclude_ext or [],
         exclude_file=exclude_file or [],
+        exclude_dir_pattern=exclude_dir_pattern or [],
+        exclude_file_pattern=exclude_file_pattern or [],
         kind=MergeKind.FILE_LIST,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
@@ -104,16 +131,23 @@ def text_merge(
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
     output_folder_name: Annotated[str | None, typer.Option("--output-folder-name")] = None,
     exclude_dir: Annotated[list[str], typer.Option("--exclude-dir")] = None,
-    exclude_ext: Annotated[list[str], typer.Option("--exclude-ext")] = None,
     exclude_file: Annotated[list[str], typer.Option("--exclude-file")] = None,
+    selected_ext: Annotated[list[str], typer.Option("--select-ext")] = None,
+    additional_ext: Annotated[list[str], typer.Option("--add-ext")] = None,
+    exclude_dir_pattern: Annotated[list[str], typer.Option("--exclude-dir-regex")] = None,
+    exclude_file_pattern: Annotated[list[str], typer.Option("--exclude-file-regex")] = None,
 ) -> None:
     request = _request(
         root_path=root_path,
         output_dir=output_dir,
         output_name=ensure_safe_output_name(output_name, "text-merge.json"),
         exclude_dir=exclude_dir or [],
-        exclude_ext=exclude_ext or [],
+        exclude_ext=[],
         exclude_file=exclude_file or [],
+        selected_ext=selected_ext,
+        additional_ext=additional_ext,
+        exclude_dir_pattern=exclude_dir_pattern or [],
+        exclude_file_pattern=exclude_file_pattern or [],
         kind=MergeKind.TEXT_MERGE,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
@@ -129,21 +163,30 @@ def mail_merge(
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
     output_folder_name: Annotated[str | None, typer.Option("--output-folder-name")] = None,
     exclude_dir: Annotated[list[str], typer.Option("--exclude-dir")] = None,
-    exclude_ext: Annotated[list[str], typer.Option("--exclude-ext")] = None,
     exclude_file: Annotated[list[str], typer.Option("--exclude-file")] = None,
     sensitive_marker: Annotated[list[str], typer.Option("--sensitive-marker")] = None,
+    sensitive_pattern: Annotated[list[str], typer.Option("--sensitive-regex")] = None,
+    selected_ext: Annotated[list[str], typer.Option("--select-ext")] = None,
+    additional_ext: Annotated[list[str], typer.Option("--add-ext")] = None,
+    exclude_dir_pattern: Annotated[list[str], typer.Option("--exclude-dir-regex")] = None,
+    exclude_file_pattern: Annotated[list[str], typer.Option("--exclude-file-regex")] = None,
 ) -> None:
     request = _request(
         root_path=root_path,
         output_dir=output_dir,
         output_name=ensure_safe_output_name(output_name, "mail-merge.json"),
         exclude_dir=exclude_dir or [],
-        exclude_ext=exclude_ext or [],
+        exclude_ext=[],
         exclude_file=exclude_file or [],
         kind=MergeKind.MAIL_MERGE,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
         sensitive_marker=sensitive_marker,
+        sensitive_pattern=sensitive_pattern,
+        selected_ext=selected_ext,
+        additional_ext=additional_ext,
+        exclude_dir_pattern=exclude_dir_pattern or [],
+        exclude_file_pattern=exclude_file_pattern or [],
     )
     _run_and_print(MergeKind.MAIL_MERGE, request)
 
@@ -156,21 +199,30 @@ def powerpoint_merge(
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
     output_folder_name: Annotated[str | None, typer.Option("--output-folder-name")] = None,
     exclude_dir: Annotated[list[str], typer.Option("--exclude-dir")] = None,
-    exclude_ext: Annotated[list[str], typer.Option("--exclude-ext")] = None,
     exclude_file: Annotated[list[str], typer.Option("--exclude-file")] = None,
     sensitive_marker: Annotated[list[str], typer.Option("--sensitive-marker")] = None,
+    sensitive_pattern: Annotated[list[str], typer.Option("--sensitive-regex")] = None,
+    selected_ext: Annotated[list[str], typer.Option("--select-ext")] = None,
+    additional_ext: Annotated[list[str], typer.Option("--add-ext")] = None,
+    exclude_dir_pattern: Annotated[list[str], typer.Option("--exclude-dir-regex")] = None,
+    exclude_file_pattern: Annotated[list[str], typer.Option("--exclude-file-regex")] = None,
 ) -> None:
     request = _request(
         root_path=root_path,
         output_dir=output_dir,
         output_name=ensure_safe_output_name(output_name, "merged.pptx"),
         exclude_dir=exclude_dir or [],
-        exclude_ext=exclude_ext or [],
+        exclude_ext=[],
         exclude_file=exclude_file or [],
         kind=MergeKind.POWERPOINT_MERGE,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
         sensitive_marker=sensitive_marker,
+        sensitive_pattern=sensitive_pattern,
+        selected_ext=selected_ext,
+        additional_ext=additional_ext,
+        exclude_dir_pattern=exclude_dir_pattern or [],
+        exclude_file_pattern=exclude_file_pattern or [],
     )
     _run_and_print(MergeKind.POWERPOINT_MERGE, request)
 
@@ -183,21 +235,30 @@ def excel_merge(
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
     output_folder_name: Annotated[str | None, typer.Option("--output-folder-name")] = None,
     exclude_dir: Annotated[list[str], typer.Option("--exclude-dir")] = None,
-    exclude_ext: Annotated[list[str], typer.Option("--exclude-ext")] = None,
     exclude_file: Annotated[list[str], typer.Option("--exclude-file")] = None,
     sensitive_marker: Annotated[list[str], typer.Option("--sensitive-marker")] = None,
+    sensitive_pattern: Annotated[list[str], typer.Option("--sensitive-regex")] = None,
+    selected_ext: Annotated[list[str], typer.Option("--select-ext")] = None,
+    additional_ext: Annotated[list[str], typer.Option("--add-ext")] = None,
+    exclude_dir_pattern: Annotated[list[str], typer.Option("--exclude-dir-regex")] = None,
+    exclude_file_pattern: Annotated[list[str], typer.Option("--exclude-file-regex")] = None,
 ) -> None:
     request = _request(
         root_path=root_path,
         output_dir=output_dir,
         output_name=ensure_safe_output_name(output_name, "merged.xlsx"),
         exclude_dir=exclude_dir or [],
-        exclude_ext=exclude_ext or [],
+        exclude_ext=[],
         exclude_file=exclude_file or [],
         kind=MergeKind.EXCEL_MERGE,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
         sensitive_marker=sensitive_marker,
+        sensitive_pattern=sensitive_pattern,
+        selected_ext=selected_ext,
+        additional_ext=additional_ext,
+        exclude_dir_pattern=exclude_dir_pattern or [],
+        exclude_file_pattern=exclude_file_pattern or [],
     )
     _run_and_print(MergeKind.EXCEL_MERGE, request)
 
@@ -210,21 +271,30 @@ def word_merge(
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
     output_folder_name: Annotated[str | None, typer.Option("--output-folder-name")] = None,
     exclude_dir: Annotated[list[str], typer.Option("--exclude-dir")] = None,
-    exclude_ext: Annotated[list[str], typer.Option("--exclude-ext")] = None,
     exclude_file: Annotated[list[str], typer.Option("--exclude-file")] = None,
     sensitive_marker: Annotated[list[str], typer.Option("--sensitive-marker")] = None,
+    sensitive_pattern: Annotated[list[str], typer.Option("--sensitive-regex")] = None,
+    selected_ext: Annotated[list[str], typer.Option("--select-ext")] = None,
+    additional_ext: Annotated[list[str], typer.Option("--add-ext")] = None,
+    exclude_dir_pattern: Annotated[list[str], typer.Option("--exclude-dir-regex")] = None,
+    exclude_file_pattern: Annotated[list[str], typer.Option("--exclude-file-regex")] = None,
 ) -> None:
     request = _request(
         root_path=root_path,
         output_dir=output_dir,
         output_name=ensure_safe_output_name(output_name, "merged.docx"),
         exclude_dir=exclude_dir or [],
-        exclude_ext=exclude_ext or [],
+        exclude_ext=[],
         exclude_file=exclude_file or [],
         kind=MergeKind.WORD_MERGE,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
         sensitive_marker=sensitive_marker,
+        sensitive_pattern=sensitive_pattern,
+        selected_ext=selected_ext,
+        additional_ext=additional_ext,
+        exclude_dir_pattern=exclude_dir_pattern or [],
+        exclude_file_pattern=exclude_file_pattern or [],
     )
     _run_and_print(MergeKind.WORD_MERGE, request)
 
@@ -237,21 +307,30 @@ def pdf_merge(
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
     output_folder_name: Annotated[str | None, typer.Option("--output-folder-name")] = None,
     exclude_dir: Annotated[list[str], typer.Option("--exclude-dir")] = None,
-    exclude_ext: Annotated[list[str], typer.Option("--exclude-ext")] = None,
     exclude_file: Annotated[list[str], typer.Option("--exclude-file")] = None,
     sensitive_marker: Annotated[list[str], typer.Option("--sensitive-marker")] = None,
+    sensitive_pattern: Annotated[list[str], typer.Option("--sensitive-regex")] = None,
+    selected_ext: Annotated[list[str], typer.Option("--select-ext")] = None,
+    additional_ext: Annotated[list[str], typer.Option("--add-ext")] = None,
+    exclude_dir_pattern: Annotated[list[str], typer.Option("--exclude-dir-regex")] = None,
+    exclude_file_pattern: Annotated[list[str], typer.Option("--exclude-file-regex")] = None,
 ) -> None:
     request = _request(
         root_path=root_path,
         output_dir=output_dir,
         output_name=ensure_safe_output_name(output_name, "merged.pdf"),
         exclude_dir=exclude_dir or [],
-        exclude_ext=exclude_ext or [],
+        exclude_ext=[],
         exclude_file=exclude_file or [],
         kind=MergeKind.PDF_MERGE,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
         sensitive_marker=sensitive_marker,
+        sensitive_pattern=sensitive_pattern,
+        selected_ext=selected_ext,
+        additional_ext=additional_ext,
+        exclude_dir_pattern=exclude_dir_pattern or [],
+        exclude_file_pattern=exclude_file_pattern or [],
     )
     _run_and_print(MergeKind.PDF_MERGE, request)
 
@@ -264,9 +343,13 @@ def image_merge(
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
     output_folder_name: Annotated[str | None, typer.Option("--output-folder-name")] = None,
     exclude_dir: Annotated[list[str], typer.Option("--exclude-dir")] = None,
-    exclude_ext: Annotated[list[str], typer.Option("--exclude-ext")] = None,
     exclude_file: Annotated[list[str], typer.Option("--exclude-file")] = None,
     sensitive_marker: Annotated[list[str], typer.Option("--sensitive-marker")] = None,
+    sensitive_pattern: Annotated[list[str], typer.Option("--sensitive-regex")] = None,
+    selected_ext: Annotated[list[str], typer.Option("--select-ext")] = None,
+    additional_ext: Annotated[list[str], typer.Option("--add-ext")] = None,
+    exclude_dir_pattern: Annotated[list[str], typer.Option("--exclude-dir-regex")] = None,
+    exclude_file_pattern: Annotated[list[str], typer.Option("--exclude-file-regex")] = None,
     image_format: Annotated[list[str], typer.Option("--format")] = None,
 ) -> None:
     formats = image_format or ["html"]
@@ -275,12 +358,17 @@ def image_merge(
         output_dir=output_dir,
         output_name=ensure_safe_output_name(output_name, "images.html"),
         exclude_dir=exclude_dir or [],
-        exclude_ext=exclude_ext or [],
+        exclude_ext=[],
         exclude_file=exclude_file or [],
         kind=MergeKind.IMAGE_MERGE,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
         sensitive_marker=sensitive_marker,
+        sensitive_pattern=sensitive_pattern,
+        selected_ext=selected_ext,
+        additional_ext=additional_ext,
+        exclude_dir_pattern=exclude_dir_pattern or [],
+        exclude_file_pattern=exclude_file_pattern or [],
         image_format=formats,
     )
     _run_and_print(MergeKind.IMAGE_MERGE, request)

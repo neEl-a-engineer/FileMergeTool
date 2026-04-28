@@ -16,7 +16,12 @@ class JobCreateRequest(BaseModel):
     output_name: str | None = None
     setting_name: str | None = None
     image_output_formats: list[str] = Field(default_factory=list)
-    exclude_dirs: list[str] = Field(default_factory=list)
     exclude_extensions: list[str] = Field(default_factory=list)
+    selected_extensions: list[str] = Field(default_factory=list)
+    additional_extensions: list[str] = Field(default_factory=list)
+    exclude_dirs: list[str] = Field(default_factory=list)
+    exclude_dir_patterns: list[str] = Field(default_factory=list)
     exclude_files: list[str] = Field(default_factory=list)
+    exclude_file_patterns: list[str] = Field(default_factory=list)
     additional_sensitive_markers: list[str] = Field(default_factory=list)
+    additional_sensitive_patterns: list[str] = Field(default_factory=list)

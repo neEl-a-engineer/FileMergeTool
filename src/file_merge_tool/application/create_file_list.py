@@ -9,7 +9,7 @@ from file_merge_tool.domain.artifact import (
     model_to_dict,
 )
 from file_merge_tool.domain.config import MergeRequest
-from file_merge_tool.domain.result import MergeResult
+from file_merge_tool.domain.result import FileResult, MergeResult
 from file_merge_tool.application.output_files import file_list_output_path
 from file_merge_tool.scanning.walker import walk_tree
 from file_merge_tool.writers.json_writer import write_json
@@ -17,6 +17,16 @@ from file_merge_tool.writers.json_writer import write_json
 
 def create_file_list(request: MergeRequest) -> MergeResult:
     items = list(walk_tree(request.root_path, request.exclude))
+    file_results = [
+        FileResult(
+            relative_path=item.relative_path,
+            source_path=str(item.absolute_path),
+            status="skipped" if item.excluded else "merged",
+            skip_reason=item.excluded_reason if item.excluded else None,
+            details="The path matched an exclusion rule during traversal." if item.excluded else None,
+        )
+        for item in items
+    ]
     skipped_items = [
         SkippedItem(
             relative_path=item.relative_path,
@@ -64,6 +74,7 @@ def create_file_list(request: MergeRequest) -> MergeResult:
         item_count=len(items),
         skipped_count=excluded_count,
         excluded_count=excluded_count,
+        file_results=tuple(file_results),
     )
 
 

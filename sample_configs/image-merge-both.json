@@ -4,6 +4,8 @@
   "output_stem": "images",
   "image_output_formats": ["html", "pptx"],
   "exclude_dirs": [".git", ".venv", "__pycache__", "node_modules"],
-  "exclude_extensions": [],
-  "exclude_files": []
+  "exclude_files": ["Thumbs.db"],
+  "exclude_file_patterns": ["^~\\$.*"],
+  "selected_extensions": [".png", ".jpg", ".jpeg", ".webp"],
+  "additional_extensions": [".bmp", ".tiff"]
 }

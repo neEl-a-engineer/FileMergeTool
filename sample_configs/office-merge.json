@@ -3,6 +3,9 @@
   "root_path": "D:\\WebServer",
   "output_name": "merged.pptx",
   "exclude_dirs": [".git", ".venv", "__pycache__", "node_modules"],
-  "exclude_extensions": []
+  "exclude_files": ["Thumbs.db"],
+  "exclude_file_patterns": ["^~\\$.*"],
+  "selected_extensions": [".ppt", ".pptm", ".pptx"],
+  "additional_sensitive_markers": ["社外秘"],
+  "additional_sensitive_patterns": ["CONFIDENTIAL"]
 }
-

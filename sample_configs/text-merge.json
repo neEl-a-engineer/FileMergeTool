@@ -3,6 +3,10 @@
   "root_path": "D:\\WebServer",
   "output_name": "text-merge.json",
   "exclude_dirs": [".git", ".venv", "__pycache__", "node_modules"],
-  "exclude_extensions": [".png", ".jpg", ".jpeg", ".gif", ".zip", ".exe", ".dll"]
+  "exclude_files": ["Thumbs.db"],
+  "exclude_file_patterns": ["^~\\$.*"],
+  "selected_extensions": [".txt", ".md", ".json", ".py"],
+  "additional_extensions": [".cfg", ".toml"],
+  "additional_sensitive_markers": ["社外秘"],
+  "additional_sensitive_patterns": ["CONFIDENTIAL"]
 }
-

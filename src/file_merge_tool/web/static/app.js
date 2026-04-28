@@ -7,9 +7,16 @@ const outputDir = document.querySelector("#output-dir");
 const rootPath = document.querySelector("#root-path");
 const excludeDirs = document.querySelector("#exclude-dirs");
 const excludeExts = document.querySelector("#exclude-exts");
+const excludeDirPatterns = document.querySelector("#exclude-dir-patterns");
 const excludeFiles = document.querySelector("#exclude-files");
+const excludeFilePatterns = document.querySelector("#exclude-file-patterns");
+const extensionSelectionPanel = document.querySelector("#extension-selection-panel");
+const selectedExtensionChips = document.querySelector("#selected-extension-chips");
+const additionalExts = document.querySelector("#additional-exts");
 const additionalMarkers = document.querySelector("#additional-markers");
+const additionalMarkerPatterns = document.querySelector("#additional-marker-patterns");
 const globalMarkers = document.querySelector("#global-markers");
+const globalMarkerPatterns = document.querySelector("#global-marker-patterns");
 const savedSettingsCount = document.querySelector("#saved-settings-count");
 const openSavedSettings = document.querySelector("#open-saved-settings");
 const savedSettingsDialog = document.querySelector("#saved-settings-dialog");
@@ -58,8 +65,56 @@ const kinds = {
   "image-merge": { label: { ja: "画像", en: "Image merge" }, ext: "html", stem: "images" },
 };
 
-const genericExcludeExts = [".png", ".jpg", ".jpeg", ".gif", ".zip", ".exe", ".dll"];
-const imageExcludeExts = [".zip", ".exe", ".dll"];
+const textExtensionGroups = [
+  {
+    key: "plain-text",
+    label: { ja: "純テキスト系", en: "Plain text" },
+    extensions: [".txt", ".md", ".log", ".rst"],
+  },
+  {
+    key: "structured-text",
+    label: { ja: "構造テキスト系", en: "Structured text" },
+    extensions: [".json", ".xml", ".csv", ".tsv"],
+  },
+  {
+    key: "config",
+    label: { ja: "設定 / 構成系", en: "Config / setup" },
+    extensions: [".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".env", ".gitignore"],
+  },
+  {
+    key: "web",
+    label: { ja: "Web系", en: "Web stack" },
+    extensions: [".html", ".css", ".js", ".jsx", ".ts", ".tsx"],
+  },
+  {
+    key: "command-script",
+    label: { ja: "コマンドスクリプト系", en: "Command scripts" },
+    extensions: [".sh", ".ps1", ".bat", ".cmd"],
+  },
+  {
+    key: "programming",
+    label: { ja: "プログラミング言語系", en: "Programming languages" },
+    extensions: [".py", ".java", ".c", ".cpp", ".h", ".hpp", ".cs", ".go", ".rs", ".php", ".rb", ".kt", ".swift", ".sql"],
+  },
+];
+
+function flattenExtensionGroups(groups) {
+  return groups.flatMap((group) => group.extensions);
+}
+
+const extensionOptionsByKind = {
+  "text-merge": flattenExtensionGroups(textExtensionGroups),
+  "mail-merge": [".msg"],
+  "powerpoint-merge": [".ppt", ".pptm", ".pps", ".ppsm", ".ppsx", ".pot", ".potm", ".potx", ".pptx"],
+  "excel-merge": [".csv", ".ods", ".tsv", ".xls", ".xlsb", ".xlsm", ".xlsx", ".xlt", ".xltm", ".xltx"],
+  "word-merge": [".doc", ".docm", ".docx", ".dot", ".dotm", ".dotx", ".odt", ".rtf"],
+  "pdf-merge": [".pdf"],
+  "image-merge": [".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"],
+};
+
+const extensionGroupsByKind = {
+  "text-merge": textExtensionGroups,
+};
 
 const translations = {
   ja: {
@@ -95,8 +150,15 @@ const translations = {
     rootPath: "収集対象ルートフォルダ",
     excludeDirs: "除外フォルダ",
     excludeExts: "除外拡張子",
+    excludeDirPatterns: "除外フォルダ正規表現",
     excludeFiles: "除外ファイル名",
+    excludeFilePatterns: "除外ファイル名正規表現",
+    selectedExts: "収集対象拡張子",
+    additionalExts: "追加拡張子",
+    extensionSelectAll: "全選択",
+    extensionClearAll: "全解除",
     additionalMarkers: "追加機密分類判定文字列",
+    additionalMarkerPatterns: "追加機密分類判定正規表現",
     imageOutputFormat: "画像出力形式",
     imageFormatHtml: "HTML",
     imageFormatPptx: "PPTX",
@@ -105,6 +167,7 @@ const translations = {
     runJob: "実行",
     settingsTitle: "全体設定",
     globalMarkers: "全体機密分類判定文字列",
+    globalMarkerPatterns: "全体機密分類判定正規表現",
     language: "言語",
     restartServer: "サーバーを再起動",
     saveGlobalSettings: "全体設定を保存",
@@ -182,8 +245,15 @@ const translations = {
     rootPath: "Collection root folder",
     excludeDirs: "Excluded folders",
     excludeExts: "Excluded extensions",
+    excludeDirPatterns: "Excluded folder regex",
     excludeFiles: "Excluded file names",
+    excludeFilePatterns: "Excluded file name regex",
+    selectedExts: "Collected extensions",
+    additionalExts: "Additional extensions",
+    extensionSelectAll: "Select all",
+    extensionClearAll: "Clear",
     additionalMarkers: "Additional sensitive markers",
+    additionalMarkerPatterns: "Additional sensitive regex",
     imageOutputFormat: "Image output format",
     imageFormatHtml: "HTML",
     imageFormatPptx: "PPTX",
@@ -192,6 +262,7 @@ const translations = {
     runJob: "Run",
     settingsTitle: "Global Settings",
     globalMarkers: "Global sensitive markers",
+    globalMarkerPatterns: "Global sensitive regex",
     language: "Language",
     restartServer: "Restart server",
     saveGlobalSettings: "Save global settings",
@@ -243,6 +314,7 @@ let language = "ja";
 let savedSettingsCache = [];
 let currentJobStatus = { status: "idle", warnings: [], output_paths: [] };
 let pendingDeletePresetName = null;
+const extensionStateByKind = {};
 
 function splitList(value) {
   return value
@@ -253,6 +325,145 @@ function splitList(value) {
 
 function joinList(value) {
   return (value || []).join(", ");
+}
+
+function normalizeExtension(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith(".") ? trimmed : `.${trimmed}`;
+}
+
+function normalizeExtensionList(values) {
+  const normalized = [];
+  const seen = new Set();
+  for (const value of values || []) {
+    const extension = normalizeExtension(value);
+    if (!extension || seen.has(extension)) continue;
+    seen.add(extension);
+    normalized.push(extension);
+  }
+  return normalized;
+}
+
+function defaultSelectedExtensions(kind) {
+  return [...(extensionOptionsByKind[kind] || [])];
+}
+
+function currentSelectedExtensions() {
+  return [...selectedExtensionChips.querySelectorAll(".extension-chip.is-selected")].map((button) => button.dataset.ext);
+}
+
+function currentAdditionalExtensions() {
+  return normalizeExtensionList(splitList(additionalExts.value));
+}
+
+function ensureExtensionState(kind) {
+  if (!extensionStateByKind[kind]) {
+    extensionStateByKind[kind] = {
+      selectedExtensions: defaultSelectedExtensions(kind),
+      additionalExtensions: [],
+    };
+  }
+  return extensionStateByKind[kind];
+}
+
+function saveExtensionState(kind) {
+  if (!kind || kind === "file-list" || kind === "history" || kind === "settings") {
+    return;
+  }
+  extensionStateByKind[kind] = {
+    selectedExtensions: currentSelectedExtensions(),
+    additionalExtensions: currentAdditionalExtensions(),
+  };
+}
+
+function loadExtensionState(kind) {
+  const state = ensureExtensionState(kind);
+  renderExtensionChips(kind, state.selectedExtensions);
+  additionalExts.value = joinList(state.additionalExtensions);
+}
+
+function renderExtensionChips(kind, selectedValues) {
+  selectedExtensionChips.innerHTML = "";
+  const selectedSet = new Set(normalizeExtensionList(selectedValues));
+
+  const groups = extensionGroupsByKind[kind];
+  if (groups?.length) {
+    for (const group of groups) {
+      selectedExtensionChips.append(createExtensionGroup(group, selectedSet));
+    }
+    return;
+  }
+
+  const flatGroup = document.createElement("div");
+  flatGroup.className = "extension-chip-list";
+  for (const extension of extensionOptionsByKind[kind] || []) {
+    flatGroup.append(createExtensionChip(extension, selectedSet));
+  }
+  selectedExtensionChips.append(flatGroup);
+}
+
+function createExtensionGroup(group, selectedSet) {
+  const section = document.createElement("section");
+  section.className = "extension-group";
+  section.dataset.groupKey = group.key;
+
+  const header = document.createElement("div");
+  header.className = "extension-group-header";
+
+  const title = document.createElement("p");
+  title.className = "extension-group-title";
+  title.textContent = group.label?.[language] || group.key;
+
+  const actions = document.createElement("div");
+  actions.className = "extension-group-actions";
+
+  const selectAll = document.createElement("button");
+  selectAll.type = "button";
+  selectAll.className = "extension-group-action";
+  selectAll.textContent = translations[language].extensionSelectAll;
+  selectAll.addEventListener("click", () => {
+    setGroupSelection(section, true);
+  });
+
+  const clearAll = document.createElement("button");
+  clearAll.type = "button";
+  clearAll.className = "extension-group-action";
+  clearAll.textContent = translations[language].extensionClearAll;
+  clearAll.addEventListener("click", () => {
+    setGroupSelection(section, false);
+  });
+
+  actions.append(selectAll, clearAll);
+  header.append(title, actions);
+
+  const chips = document.createElement("div");
+  chips.className = "extension-chip-list";
+  for (const extension of group.extensions) {
+    chips.append(createExtensionChip(extension, selectedSet));
+  }
+
+  section.append(header, chips);
+  return section;
+}
+
+function createExtensionChip(extension, selectedSet) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "extension-chip";
+  button.dataset.ext = extension;
+  button.textContent = extension;
+  button.classList.toggle("is-selected", selectedSet.has(extension));
+  button.addEventListener("click", () => {
+    button.classList.toggle("is-selected");
+  });
+  return button;
+}
+
+function setGroupSelection(groupElement, shouldSelect) {
+  for (const chip of groupElement.querySelectorAll(".extension-chip")) {
+    chip.classList.toggle("is-selected", shouldSelect);
+  }
 }
 
 function outputName() {
@@ -274,6 +485,10 @@ function sensitivityMarkersForRequest() {
   return [...new Set([...splitList(globalMarkers.value), ...splitList(additionalMarkers.value)])];
 }
 
+function sensitivityPatternsForRequest() {
+  return [...new Set([...splitList(globalMarkerPatterns.value), ...splitList(additionalMarkerPatterns.value)])];
+}
+
 function primaryExtension() {
   if (activeKind !== "image-merge") {
     return kinds[activeKind].ext;
@@ -289,6 +504,7 @@ function setImageOutputMode(mode) {
 }
 
 function currentFormState() {
+  saveExtensionState(activeKind);
   return {
     name: settingName.value.trim(),
     kind: activeKind,
@@ -297,8 +513,13 @@ function currentFormState() {
     rootPath: rootPath.value.trim(),
     excludeDirs: splitList(excludeDirs.value),
     excludeExts: splitList(excludeExts.value),
+    excludeDirPatterns: splitList(excludeDirPatterns.value),
     excludeFiles: splitList(excludeFiles.value),
+    excludeFilePatterns: splitList(excludeFilePatterns.value),
+    selectedExtensions: activeKind === "file-list" ? [] : currentSelectedExtensions(),
+    additionalExtensions: activeKind === "file-list" ? [] : currentAdditionalExtensions(),
     additionalMarkers: splitList(additionalMarkers.value),
+    additionalMarkerPatterns: splitList(additionalMarkerPatterns.value),
     imageOutputMode: selectedImageOutputMode(),
   };
 }
@@ -311,9 +532,17 @@ function applyFormState(state) {
   outputDir.value = state.outputDir || "80_workspace\\history";
   rootPath.value = state.rootPath || "";
   excludeDirs.value = joinList(state.excludeDirs);
-  excludeExts.value = joinList(state.excludeExts);
+  excludeExts.value = joinList(state.excludeExts || state.excludeExtensions || []);
+  excludeDirPatterns.value = joinList(state.excludeDirPatterns);
   excludeFiles.value = joinList(state.excludeFiles);
+  excludeFilePatterns.value = joinList(state.excludeFilePatterns);
   additionalMarkers.value = joinList(state.additionalMarkers);
+  additionalMarkerPatterns.value = joinList(state.additionalMarkerPatterns);
+  extensionStateByKind[kind] = {
+    selectedExtensions: normalizeExtensionList(state.selectedExtensions?.length ? state.selectedExtensions : defaultSelectedExtensions(kind)),
+    additionalExtensions: normalizeExtensionList(state.additionalExtensions || []),
+  };
+  loadExtensionState(kind);
   setImageOutputMode(state.imageOutputMode || "html");
 }
 
@@ -502,11 +731,13 @@ async function loadGlobalSettings() {
     const settings = await response.json();
     language = settings.language || "ja";
     globalMarkers.value = joinList(settings.globalMarkers || ["機密", "極秘"]);
+    globalMarkerPatterns.value = joinList(settings.globalMarkerPatterns || []);
   } catch {
     try {
       const settings = JSON.parse(localStorage.getItem(globalSettingsKey) || "{}");
       language = settings.language || "ja";
       globalMarkers.value = joinList(settings.globalMarkers || ["機密", "極秘"]);
+      globalMarkerPatterns.value = joinList(settings.globalMarkerPatterns || []);
     } catch {
       language = "ja";
     }
@@ -521,6 +752,7 @@ async function saveGlobal() {
   const payload = {
     language,
     globalMarkers: splitList(globalMarkers.value),
+    globalMarkerPatterns: splitList(globalMarkerPatterns.value),
   };
   try {
     await fetch("/api/settings/global", {
@@ -576,14 +808,20 @@ function applyLanguage() {
   updateJobStatusCard(currentJobStatus);
   renderSavedSettings();
   updateActiveKindLabel();
+  if (activeKind !== "file-list" && activeKind !== "history" && activeKind !== "settings") {
+    saveExtensionState(activeKind);
+    loadExtensionState(activeKind);
+  }
 }
 
 function setActiveKind(kind) {
   if (kind === "settings") {
+    saveExtensionState(activeKind);
     jobPanel.classList.add("is-hidden");
     historyPanel.classList.add("is-hidden");
     settingsPanel.classList.remove("is-hidden");
   } else if (kind === "history") {
+    saveExtensionState(activeKind);
     jobPanel.classList.add("is-hidden");
     settingsPanel.classList.add("is-hidden");
     historyPanel.classList.remove("is-hidden");
@@ -591,13 +829,18 @@ function setActiveKind(kind) {
   } else {
     const previousKind = activeKind;
     const currentFolderName = outputFolderName.value.trim();
+    saveExtensionState(previousKind);
     activeKind = kind;
     kindInput.value = kind;
     jobPanel.classList.remove("is-hidden");
     settingsPanel.classList.add("is-hidden");
     historyPanel.classList.add("is-hidden");
     imageOutputOptions.classList.toggle("is-hidden", kind !== "image-merge");
-    adjustExcludeExtensionsForKind(previousKind, kind);
+    excludeExts.closest(".field").classList.toggle("is-hidden", kind !== "file-list");
+    extensionSelectionPanel.classList.toggle("is-hidden", kind === "file-list");
+    if (kind !== "file-list") {
+      loadExtensionState(kind);
+    }
     if (!currentFolderName || currentFolderName === kinds[previousKind].stem) {
       outputFolderName.value = kinds[kind].stem;
     }
@@ -606,17 +849,6 @@ function setActiveKind(kind) {
 
   for (const button of tabButtons) {
     button.classList.toggle("is-active", button.dataset.kind === kind);
-  }
-}
-
-function adjustExcludeExtensionsForKind(previousKind, nextKind) {
-  const current = splitList(excludeExts.value);
-  const currentText = joinList(current);
-  if (nextKind === "image-merge" && currentText === joinList(genericExcludeExts)) {
-    excludeExts.value = joinList(imageExcludeExts);
-  }
-  if (previousKind === "image-merge" && currentText === joinList(imageExcludeExts)) {
-    excludeExts.value = joinList(genericExcludeExts);
   }
 }
 
@@ -671,10 +903,15 @@ form.addEventListener("submit", async (event) => {
     output_folder_name: outputFolderName.value.trim() || kinds[activeKind].stem,
     setting_name: settingName.value.trim(),
     image_output_formats: selectedImageOutputFormats(),
+    exclude_extensions: activeKind === "file-list" ? splitList(excludeExts.value) : [],
+    selected_extensions: activeKind === "file-list" ? [] : currentSelectedExtensions(),
+    additional_extensions: activeKind === "file-list" ? [] : currentAdditionalExtensions(),
     exclude_dirs: splitList(excludeDirs.value),
-    exclude_extensions: splitList(excludeExts.value),
+    exclude_dir_patterns: splitList(excludeDirPatterns.value),
     exclude_files: splitList(excludeFiles.value),
+    exclude_file_patterns: splitList(excludeFilePatterns.value),
     additional_sensitive_markers: sensitivityMarkersForRequest(),
+    additional_sensitive_patterns: sensitivityPatternsForRequest(),
   };
 
   try {

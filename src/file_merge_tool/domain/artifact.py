@@ -15,7 +15,15 @@ TRAVERSAL_ORDER = "files-first-depth-first-name-asc"
 class ExcludeInfo(BaseModel):
     folders: list[str] = Field(default_factory=list)
     extensions: list[str] = Field(default_factory=list)
+    folder_patterns: list[str] = Field(default_factory=list)
     file_names: list[str] = Field(default_factory=list)
+    file_patterns: list[str] = Field(default_factory=list)
+
+
+class CollectionInfo(BaseModel):
+    selected_extensions: list[str] = Field(default_factory=list)
+    additional_extensions: list[str] = Field(default_factory=list)
+    effective_extensions: list[str] = Field(default_factory=list)
 
 
 class TraversalInfo(BaseModel):
@@ -26,6 +34,7 @@ class TraversalInfo(BaseModel):
 class SensitivityInfo(BaseModel):
     default_markers: list[str] = Field(default_factory=list)
     additional_markers: list[str] = Field(default_factory=list)
+    regex_patterns: list[str] = Field(default_factory=list)
     split_outputs: bool = True
 
 
@@ -39,6 +48,7 @@ class ArtifactHeader(BaseModel):
     source_root: str
     setting_name: str | None = None
     traversal: TraversalInfo = Field(default_factory=TraversalInfo)
+    collection: CollectionInfo
     exclude: ExcludeInfo
     sensitivity: SensitivityInfo
 
@@ -73,6 +83,8 @@ def build_artifact_header(
     kind: str,
     classification: str = "normal",
 ) -> dict[str, Any]:
+    from file_merge_tool.domain.extension_selection import effective_selected_extensions
+
     default_markers = list(SENSITIVE_MARKERS)
     additional_markers = [
         marker for marker in request.sensitivity_markers if marker not in default_markers
@@ -85,14 +97,28 @@ def build_artifact_header(
         generated_at=datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
         source_root=str(request.root_path.resolve()),
         setting_name=request.setting_name,
+        collection=CollectionInfo(
+            selected_extensions=list(request.selected_extensions),
+            additional_extensions=list(request.additional_extensions),
+            effective_extensions=list(
+                effective_selected_extensions(
+                    request.selected_extensions,
+                    request.additional_extensions,
+                    kind=request.kind,
+                )
+            ),
+        ),
         exclude=ExcludeInfo(
             folders=list(request.exclude.folder_names),
             extensions=list(request.exclude.extensions),
+            folder_patterns=list(request.exclude.folder_patterns),
             file_names=list(request.exclude.file_names),
+            file_patterns=list(request.exclude.file_patterns),
         ),
         sensitivity=SensitivityInfo(
             default_markers=default_markers,
             additional_markers=list(additional_markers),
+            regex_patterns=list(request.sensitivity_patterns),
         ),
     )
     return model_to_dict(header, by_alias=True, exclude_none=True)

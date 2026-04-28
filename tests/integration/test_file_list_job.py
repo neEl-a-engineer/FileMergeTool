@@ -44,6 +44,25 @@ def test_file_list_marks_excluded_file_name(tmp_path: Path) -> None:
     assert '"excluded_reason": "excluded_file_name"' in output
 
 
+def test_file_list_marks_excluded_extension(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "ignore.log").write_text("log", encoding="utf-8")
+
+    request = MergeRequest(
+        root_path=root,
+        output_dir=tmp_path / "out",
+        output_name="file-list.json",
+        exclude=ExcludeConfig.from_iterables([], [".log"], []),
+    )
+
+    result = create_file_list(request)
+
+    output = result.output_paths[0].read_text(encoding="utf-8")
+    assert '"relative_path": "ignore.log"' in output
+    assert '"excluded_reason": "excluded_extension"' in output
+
+
 def test_file_list_uses_files_first_depth_first_order(tmp_path: Path) -> None:
     root = tmp_path / "root"
     child = root / "child"
