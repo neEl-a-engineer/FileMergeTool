@@ -17,6 +17,30 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _first_existing_dir(repo_root: Path, *candidates: str) -> str:
+    for candidate in candidates:
+        if (repo_root / candidate).exists():
+            return candidate
+    return candidates[0]
+
+
+def _scripts_dir_name(repo_root: Path | None = None) -> str:
+    return _first_existing_dir(repo_root or _repo_root(), "40_scripts", "scripts")
+
+
+def _tests_dir_name(repo_root: Path | None = None) -> str:
+    return _first_existing_dir(repo_root or _repo_root(), "30_tests", "tests")
+
+
+def _optional_script_path(script_name: str) -> Path | None:
+    repo_root = _repo_root()
+    for scripts_dir_name in ("40_scripts", "scripts"):
+        candidate = repo_root / scripts_dir_name / script_name
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _run_script(script_path: Path, *args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     if POWERSHELL is None:
         pytest.skip("PowerShell is not available")
@@ -72,7 +96,8 @@ def test_release_mode_fails_on_secret_in_bundle(tmp_path: Path) -> None:
     (export_root / "README.md").write_text(secret_line, encoding="utf-8")
 
     config_path = _write_config(project_root)
-    script_path = _repo_root() / "40_scripts" / "check-sensitive-data.ps1"
+    repo_root = _repo_root()
+    script_path = repo_root / _scripts_dir_name(repo_root) / "check-sensitive-data.ps1"
 
     result = _run_script(
         script_path,
@@ -106,7 +131,8 @@ def test_push_mode_fails_on_staged_secret(tmp_path: Path) -> None:
     (project_root / "config.txt").write_text(secret_line, encoding="utf-8")
     subprocess.run(["git", "add", "config.txt"], cwd=project_root, check=True)
 
-    script_path = _repo_root() / "40_scripts" / "check-sensitive-data.ps1"
+    repo_root = _repo_root()
+    script_path = repo_root / _scripts_dir_name(repo_root) / "check-sensitive-data.ps1"
     result = _run_script(
         script_path,
         "-Mode",
@@ -143,7 +169,8 @@ def test_push_mode_fails_on_unpushed_committed_secret(tmp_path: Path) -> None:
     subprocess.run(["git", "add", "local-only.txt"], cwd=project_root, check=True)
     subprocess.run(["git", "commit", "-m", "local only secret"], cwd=project_root, check=True, capture_output=True, text=True)
 
-    script_path = _repo_root() / "40_scripts" / "check-sensitive-data.ps1"
+    repo_root = _repo_root()
+    script_path = repo_root / _scripts_dir_name(repo_root) / "check-sensitive-data.ps1"
     result = _run_script(
         script_path,
         "-Mode",
@@ -174,7 +201,8 @@ def test_push_mode_fails_on_disallowed_extension(tmp_path: Path) -> None:
     (project_root / "report.pdf").write_text("not a real pdf but enough for filename policy\n", encoding="utf-8")
     subprocess.run(["git", "add", "report.pdf"], cwd=project_root, check=True)
 
-    script_path = _repo_root() / "40_scripts" / "check-sensitive-data.ps1"
+    repo_root = _repo_root()
+    script_path = repo_root / _scripts_dir_name(repo_root) / "check-sensitive-data.ps1"
     result = _run_script(
         script_path,
         "-Mode",
@@ -197,7 +225,8 @@ def test_install_git_hooks_sets_core_hooks_path(tmp_path: Path) -> None:
     hooks_dir.mkdir()
     (hooks_dir / "pre-push").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
 
-    script_path = _repo_root() / "40_scripts" / "install-git-hooks.ps1"
+    repo_root = _repo_root()
+    script_path = repo_root / _scripts_dir_name(repo_root) / "install-git-hooks.ps1"
     result = _run_script(
         script_path,
         "-ProjectRoot",
@@ -222,17 +251,18 @@ def test_pre_push_hook_blocks_disallowed_extension_push(tmp_path: Path) -> None:
     subprocess.run(["git", "config", "user.name", "Test User"], cwd=project_root, check=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=project_root, check=True)
 
-    scripts_dir = project_root / "40_scripts"
+    repo_root = _repo_root()
+    scripts_dir_name = _scripts_dir_name(repo_root)
+    scripts_dir = project_root / scripts_dir_name
     scripts_dir.mkdir()
     hooks_dir = project_root / ".githooks"
     hooks_dir.mkdir()
 
-    repo_root = _repo_root()
-    shutil.copy2(repo_root / "40_scripts" / "check-sensitive-data.ps1", scripts_dir / "check-sensitive-data.ps1")
+    shutil.copy2(repo_root / scripts_dir_name / "check-sensitive-data.ps1", scripts_dir / "check-sensitive-data.ps1")
     shutil.copy2(repo_root / ".githooks" / "pre-push", hooks_dir / "pre-push")
 
     config_path = _write_config(project_root, history_range="HEAD~5..HEAD")
-    install_script = repo_root / "40_scripts" / "install-git-hooks.ps1"
+    install_script = repo_root / scripts_dir_name / "install-git-hooks.ps1"
     install_result = _run_script(
         install_script,
         "-ProjectRoot",
@@ -241,7 +271,11 @@ def test_pre_push_hook_blocks_disallowed_extension_push(tmp_path: Path) -> None:
     assert install_result.returncode == 0, install_result.stdout + install_result.stderr
 
     (project_root / "README.md").write_text("safe\n", encoding="utf-8")
-    subprocess.run(["git", "add", "README.md", config_path.name, ".githooks/pre-push", "40_scripts/check-sensitive-data.ps1"], cwd=project_root, check=True)
+    subprocess.run(
+        ["git", "add", "README.md", config_path.name, ".githooks/pre-push", f"{scripts_dir_name}/check-sensitive-data.ps1"],
+        cwd=project_root,
+        check=True,
+    )
     subprocess.run(["git", "commit", "-m", "init"], cwd=project_root, check=True, capture_output=True, text=True)
 
     remote_root = tmp_path / "remote.git"
@@ -268,7 +302,9 @@ def test_pre_push_hook_blocks_disallowed_extension_push(tmp_path: Path) -> None:
 
 def test_export_public_runs_sensitive_check_and_copies_assets(tmp_path: Path) -> None:
     repo_root = _repo_root()
-    script_path = repo_root / "40_scripts" / "export-public.ps1"
+    script_path = _optional_script_path("export-public.ps1")
+    if script_path is None:
+        pytest.skip("export-public.ps1 is not bundled in this repository layout")
     pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
     version_match = re.search(r'^version = "(.+)"$', pyproject_text, re.MULTILINE)
     assert version_match is not None
@@ -301,11 +337,14 @@ def test_export_public_runs_sensitive_check_and_copies_assets(tmp_path: Path) ->
 
 def test_export_public_skips_generated_python_artifacts_on_copy(tmp_path: Path) -> None:
     repo_root = _repo_root()
+    export_script = _optional_script_path("export-public.ps1")
+    if export_script is None:
+        pytest.skip("export-public.ps1 is not bundled in this repository layout")
     project_root = tmp_path / "project"
     script_dir = project_root / "40_scripts"
     script_dir.mkdir(parents=True)
 
-    shutil.copy2(repo_root / "40_scripts" / "export-public.ps1", script_dir / "export-public.ps1")
+    shutil.copy2(export_script, script_dir / "export-public.ps1")
 
     public_scripts = [
         "build-exe-launcher.ps1",

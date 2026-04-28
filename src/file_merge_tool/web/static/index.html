@@ -46,6 +46,9 @@
         <button class="tab-button" type="button" data-kind="history" data-i18n="tabHistory">
           履歴
         </button>
+        <button class="tab-button" type="button" data-kind="help" data-i18n="tabHelp">
+          使い方
+        </button>
         <button class="tab-button" type="button" data-kind="settings" data-i18n="tabSettings">
           設定
         </button>
@@ -228,6 +231,15 @@
             </div>
             <pre id="history-preview-content"></pre>
           </section>
+        </section>
+
+        <section class="main-panel is-hidden" id="help-panel">
+          <div class="section-heading">
+            <p class="eyebrow">Guide</p>
+            <h2 data-i18n="helpTitle">使い方</h2>
+          </div>
+          <div class="help-subtab-bar" id="help-subtab-bar" role="tablist" aria-label="Help topics"></div>
+          <section class="help-content" id="help-content" aria-live="polite"></section>
         </section>
 
         <section class="result-panel">

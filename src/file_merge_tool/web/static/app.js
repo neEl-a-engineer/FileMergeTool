@@ -32,11 +32,14 @@ const restartServerButton = document.querySelector("#restart-server");
 const jobPanel = document.querySelector("#job-panel");
 const settingsPanel = document.querySelector("#settings-panel");
 const historyPanel = document.querySelector("#history-panel");
+const helpPanel = document.querySelector("#help-panel");
 const historyList = document.querySelector("#history-list");
 const historyPreviewPanel = document.querySelector("#history-preview-panel");
 const historyPreviewTitle = document.querySelector("#history-preview-title");
 const historyPreviewContent = document.querySelector("#history-preview-content");
 const refreshHistory = document.querySelector("#refresh-history");
+const helpSubtabBar = document.querySelector("#help-subtab-bar");
+const helpContent = document.querySelector("#help-content");
 const activeKindLabel = document.querySelector("#active-kind-label");
 const jobStatusCard = document.querySelector("#job-status-card");
 const jobStatusValue = document.querySelector("#job-status-value");
@@ -116,6 +119,272 @@ const extensionGroupsByKind = {
   "text-merge": textExtensionGroups,
 };
 
+const helpSections = {
+  quickstart: {
+    label: { ja: "はじめに", en: "Quick start" },
+    title: { ja: "まずはここから", en: "Start here" },
+    lead: {
+      ja: "最初は 1 つのタブと 1 つのフォルダに絞ると、流れをつかみやすいです。ここでは最短で成果物まで辿る道筋をまとめています。",
+      en: "If this is your first run, keep it small: one tool, one folder, one clear output. This gives you a quick feel for the workflow.",
+    },
+    cards: [
+      {
+        title: { ja: "最初の3ステップ", en: "Three-step start" },
+        steps: {
+          ja: [
+            "上のタブで、やりたいマージ機能を選びます。",
+            "収集対象ルートフォルダと、必要なら出力フォルダ名や除外条件を整えます。",
+            "実行後は右下の実行結果と、履歴タブの出力ファイルを確認します。",
+          ],
+          en: [
+            "Choose the merge tool from the top tab bar.",
+            "Set the collection root, then adjust the output folder name and filters if needed.",
+            "Run the job, then check the result panel and the outputs in History.",
+          ],
+        },
+      },
+      {
+        title: { ja: "最初の試運転に向く組み合わせ", en: "Good first-run combinations" },
+        items: {
+          ja: [
+            "構成リスト: フォルダ構成を JSON で俯瞰したい時。",
+            "テキスト: Markdown やソースコードを AI に読みやすい JSON にしたい時。",
+            "PDF / Word / PowerPoint: 元ファイルの結合に加えて、本文系のマージ JSON も欲しい時。",
+          ],
+          en: [
+            "File list: when you want a JSON overview of a directory tree.",
+            "Text: when you want Markdown or source files in an AI-friendly JSON format.",
+            "PDF / Word / PowerPoint: when you want both merged files and text-oriented merge JSON outputs.",
+          ],
+        },
+      },
+      {
+        title: { ja: "実行後に見る場所", en: "Where to look after a run" },
+        items: {
+          ja: [
+            "実行結果: 成功 / 失敗、警告、出力件数を素早く確認できます。",
+            "履歴: 出力ファイルごとにプレビューや保存を行えます。",
+            "集計 JSON: スキップ理由やエラー理由まで含めて、その回の結果を追えます。",
+          ],
+          en: [
+            "Result panel: quickly check success, failure, warnings, and output count.",
+            "History: preview or download each generated artifact.",
+            "Summary JSON: inspect skipped items and errors for the full run.",
+          ],
+        },
+      },
+    ],
+  },
+  tools: {
+    label: { ja: "機能別", en: "Tool guide" },
+    title: { ja: "機能ごとの向き不向き", en: "What each tool is best at" },
+    lead: {
+      ja: "同じフォルダでも、どのタブを使うかで得られる成果物が変わります。まずは目的から逆算して選ぶのが近道です。",
+      en: "The same folder can produce very different outputs depending on the active tool. Pick the tab that best matches your goal.",
+    },
+    cards: [
+      {
+        title: { ja: "構成リスト / テキスト / メール", en: "File list / Text / Mail" },
+        items: {
+          ja: [
+            "構成リスト: まず全体構造だけ見たい時の入口。",
+            "テキスト: 拡張子を絞りながら、本文を lines 配列で保持したい時。",
+            "メール: .msg を件名、差出人、宛先、本文、添付名つきで AI 向け JSON にしたい時。",
+          ],
+          en: [
+            "File list: best as the first overview of a folder tree.",
+            "Text: best when you want explicit extension selection and line-based content capture.",
+            "Mail: best for turning .msg files into JSON with subject, sender, recipients, body, and attachments.",
+          ],
+        },
+      },
+      {
+        title: { ja: "Office / PDF", en: "Office / PDF" },
+        items: {
+          ja: [
+            "PowerPoint / PDF / Word: 元ファイルの結合に加えて、本文系マージ JSON を作ります。",
+            "Excel: 機密分類つきで、数式版 / 値版の XLSX と JSON をまとめて出力します。",
+            "PowerPoint / PDF / Office のプレビューは、サーバー側の既定アプリで実体を開きます。",
+          ],
+          en: [
+            "PowerPoint / PDF / Word produce both merged files and text-oriented merge JSON outputs.",
+            "Excel produces formula/value variants for both XLSX and JSON, with confidential split support.",
+            "Office and PDF previews open the saved file using the server machine's default app.",
+          ],
+        },
+      },
+      {
+        title: { ja: "画像", en: "Images" },
+        items: {
+          ja: [
+            "HTML / PPTX / 両方から出力形式を選べます。",
+            "人が確認しやすい見た目を重視したい時は HTML、レビュー資料にしたい時は PPTX が扱いやすいです。",
+            "履歴タブからは HTML の保存と、PPTX の既定アプリ起動を使い分けられます。",
+          ],
+          en: [
+            "Choose HTML, PPTX, or both as the output format.",
+            "HTML is best for quick visual review; PPTX is useful when the result needs to travel as slides.",
+            "History lets you download HTML artifacts or open PPTX files with the default app.",
+          ],
+        },
+      },
+    ],
+  },
+  settingsGuide: {
+    label: { ja: "設定のコツ", en: "Settings" },
+    title: { ja: "設定で迷いやすいポイント", en: "Settings that matter most" },
+    lead: {
+      ja: "このツールは、何を集めるか・何を除外するか・どう機密分類するかで挙動が大きく変わります。よく効く設定だけ先に押さえると楽です。",
+      en: "This tool's behavior changes a lot based on what you collect, what you exclude, and how you classify confidential files. These are the settings worth learning first.",
+    },
+    cards: [
+      {
+        title: { ja: "収集対象拡張子", en: "Collected extensions" },
+        items: {
+          ja: [
+            "構成リスト以外は、除外拡張子ではなく収集対象拡張子を選ぶ形です。",
+            "テキストタブでは分類ごとに拡張子を選べて、候補にないものだけ追加拡張子へ入れます。",
+            "収集対象に入っていても、内部的に読めない形式は集計 JSON に理由つきで残ります。",
+          ],
+          en: [
+            "Every merge tool except File list uses collected extensions instead of excluded extensions.",
+            "Text merge groups common extensions by category, and extra ones go into Additional extensions.",
+            "If a selected extension cannot be read by the current runtime, the summary JSON records that reason.",
+          ],
+        },
+      },
+      {
+        title: { ja: "除外ルールと正規表現", en: "Exclusions and regex" },
+        items: {
+          ja: [
+            "除外フォルダ名と除外ファイル名は、通常文字列なら完全一致、正規表現なら case-sensitive に評価します。",
+            "追加機密判定文字列は、通常文字列なら部分一致、正規表現なら case-sensitive に評価します。",
+            "保存済み設定にしておくと、毎回打ち直さずに同じルールを再利用できます。",
+          ],
+          en: [
+            "Excluded folder/file literals are exact matches; regex rules are evaluated case-sensitively.",
+            "Sensitive marker literals use partial matches; regex markers are also case-sensitive.",
+            "Saved presets are the easiest way to reuse the same rules across repeated runs.",
+          ],
+        },
+      },
+      {
+        title: { ja: "設定保存の使い方", en: "Preset workflow" },
+        items: {
+          ja: [
+            "同名保存は上書きではなく、(2), (3) のように採番して追加保存されます。",
+            "設定一覧はモーダルで開き、読込と削除をそこから行えます。",
+            "よく使うルートフォルダと判定ルールの組み合わせは、機能ごとに分けて持っておくと整理しやすいです。",
+          ],
+          en: [
+            "Saving with the same name creates numbered copies instead of overwriting the original.",
+            "The preset list opens in a modal where you can load or delete entries.",
+            "It helps to keep separate presets for each merge tool and data source pattern.",
+          ],
+        },
+      },
+    ],
+  },
+  outputs: {
+    label: { ja: "出力と履歴", en: "Outputs" },
+    title: { ja: "出力ファイルの読み方", en: "Reading the outputs" },
+    lead: {
+      ja: "実行が終わると、その回専用の履歴フォルダへ成果物がまとまります。ファイル名と履歴タブを合わせて見ると、何が生成されたかが追いやすいです。",
+      en: "Each run gets its own history folder. Once you know the naming pattern, the History tab becomes much easier to scan.",
+    },
+    cards: [
+      {
+        title: { ja: "命名ルール", en: "Naming pattern" },
+        items: {
+          ja: [
+            "履歴フォルダは `80_workspace/history/{yyyymmdd_hhmmss}_{指定フォルダ名}` です。",
+            "機密ファイルは必ず `機密_` で始まります。",
+            "出力ファイルは `指定フォルダ名_..._マージ`、集計は `指定フォルダ名_集計.json` に揃います。",
+          ],
+          en: [
+            "History folders use `80_workspace/history/{yyyymmdd_hhmmss}_{folder-name}`.",
+            "Confidential outputs always start with `機密_`.",
+            "Merge outputs follow `{folder-name}_..._マージ`, and summaries use `{folder-name}_集計.json`.",
+          ],
+        },
+      },
+      {
+        title: { ja: "履歴タブでできること", en: "What History can do" },
+        items: {
+          ja: [
+            "JSON 出力は画面内プレビューと保存を分けて使えます。",
+            "PDF / Office はサーバー側の既定アプリで開くプレビューと、保存を分けて使えます。",
+            "履歴カードを開くと、出力フォルダやエラー概要、生成ファイルの一覧まで確認できます。",
+          ],
+          en: [
+            "JSON outputs support in-app preview and download separately.",
+            "PDF and Office outputs support server-side open actions plus download.",
+            "Expanding a history entry reveals the folder, error summary, and generated artifacts.",
+          ],
+        },
+      },
+      {
+        title: { ja: "集計 JSON の見どころ", en: "What to read in the summary JSON" },
+        items: {
+          ja: [
+            "対象件数、機密件数、スキップ件数、エラー件数を 1 ファイルで追えます。",
+            "どの入力ファイルが merged / skipped / error だったかが一覧で残ります。",
+            "内部的に読めなかったファイルも、理由つきで追跡できます。",
+          ],
+          en: [
+            "One file shows scanned, confidential, skipped, and errored counts.",
+            "Each source file records whether it was merged, skipped, or failed.",
+            "Reader limitations are preserved as explicit skip reasons.",
+          ],
+        },
+      },
+    ],
+  },
+  prompts: {
+    label: { ja: "AIプロンプト例", en: "AI prompts" },
+    title: { ja: "そのまま使いやすいプロンプト例", en: "Prompt examples you can reuse" },
+    lead: {
+      ja: "マージ JSON を AI に渡す時は、まず要約、次に観点指定、最後に深掘り、の順に聞くと安定します。ここではすぐ使える叩き台を置いています。",
+      en: "When you hand merge JSON to an AI, the smoothest flow is summary first, then targeted questions, then deeper analysis. These are ready-to-use starting points.",
+    },
+    cards: [
+      {
+        title: { ja: "テキストマージ JSON 向け", en: "For text merge JSON" },
+        body: {
+          ja: "仕様書やソースコードをまとめた JSON を読み込ませる時の入口です。",
+          en: "Use this when you've merged source files, markdown, or docs into a single JSON artifact.",
+        },
+        code: {
+          ja: "このマージJSONを読んで、まず全体構成を3段階で要約してください。\\n1. フォルダ/ファイル構成の要点\\n2. 重要そうなファイルの候補\\n3. 次に深掘りすべき論点\\n\\n引用する時は、相対パスと lines の位置が分かるように示してください。",
+          en: "Read this merge JSON and summarize it in three layers:\\n1. Key points in the folder/file structure\\n2. Candidate files that look important\\n3. What should be examined next\\n\\nWhen you quote, include the relative path and enough line context to find the passage again.",
+        },
+      },
+      {
+        title: { ja: "PowerPoint / PDF / Word の本文系 JSON 向け", en: "For PowerPoint / PDF / Word merge JSON" },
+        body: {
+          ja: "人が読む資料を AI に下読みさせたい時の素直な聞き方です。",
+          en: "A good prompt when you want the AI to pre-read presentation or document material for you.",
+        },
+        code: {
+          ja: "このマージJSONを対象に、ファイルごとに次を整理してください。\\n- 何の資料か\\n- 各スライド / ページ / 文書の要点\\n- 重複している説明\\n- 人間が最終確認すべき曖昧な点\\n\\n事実と推測を分けて書いてください。",
+          en: "Using this merge JSON, organize the following for each file:\\n- What the material is about\\n- Key points by slide / page / document\\n- Repeated explanations\\n- Ambiguous areas a human should review\\n\\nPlease separate facts from inference.",
+        },
+      },
+      {
+        title: { ja: "Excel の数式版 / 値版 JSON 向け", en: "For Excel formula/value JSON" },
+        body: {
+          ja: "数式ロジックと結果の両方を見る時に相性がいい聞き方です。",
+          en: "Useful when you want to compare spreadsheet logic with the calculated values.",
+        },
+        code: {
+          ja: "数式版JSONと値版JSONを見比べて、次を整理してください。\\n- 主要なシートの役割\\n- 重要な計算ロジック\\n- 値として見ると目立つ変化や異常値\\n- 数式の意図が読み取りにくいセル群\\n\\n最後に、レビュー優先度の高いシートを上位3つ挙げてください。",
+          en: "Compare the formula JSON and the value JSON, then summarize:\\n- The role of the main sheets\\n- Important calculation logic\\n- Notable changes or outliers in the values\\n- Cells or ranges where the formula intent is hard to read\\n\\nFinish by listing the top three sheets that deserve detailed review.",
+        },
+      },
+    ],
+  },
+};
+
 const translations = {
   ja: {
     eyebrow: "Local AI Artifact Salon",
@@ -129,6 +398,7 @@ const translations = {
     tabPdf: "PDF",
     tabImage: "画像",
     tabHistory: "履歴",
+    tabHelp: "使い方",
     tabSettings: "設定",
     savedEyebrow: "Preset",
     savedTitle: "保存済み設定",
@@ -173,6 +443,7 @@ const translations = {
     saveGlobalSettings: "全体設定を保存",
     historyTitle: "履歴",
     refreshHistory: "更新",
+    helpTitle: "使い方",
     jobResult: "実行結果",
     jobStatus: "実行ステータス",
     summaryItems: "対象",
@@ -211,6 +482,9 @@ const translations = {
     restartCompleted: "サーバーが再起動しました。",
     restartFailed: "サーバー再起動に失敗しました。",
     restartTimedOut: "サーバーの再起動完了を確認できませんでした。",
+    copyPrompt: "コピー",
+    copiedPrompt: "コピー済み",
+    copyFailed: "コピー失敗",
   },
   en: {
     eyebrow: "Local AI Artifact Salon",
@@ -224,6 +498,7 @@ const translations = {
     tabPdf: "PDF",
     tabImage: "Images",
     tabHistory: "History",
+    tabHelp: "Guide",
     tabSettings: "Settings",
     savedEyebrow: "Preset",
     savedTitle: "Saved Settings",
@@ -268,6 +543,7 @@ const translations = {
     saveGlobalSettings: "Save global settings",
     historyTitle: "History",
     refreshHistory: "Refresh",
+    helpTitle: "Guide",
     jobResult: "Job Result",
     jobStatus: "Run status",
     summaryItems: "Items",
@@ -306,11 +582,15 @@ const translations = {
     restartCompleted: "Server restart completed.",
     restartFailed: "Server restart failed.",
     restartTimedOut: "Timed out while waiting for the server to restart.",
+    copyPrompt: "Copy",
+    copiedPrompt: "Copied",
+    copyFailed: "Copy failed",
   },
 };
 
 let activeKind = "file-list";
 let language = "ja";
+let activeHelpSection = "quickstart";
 let savedSettingsCache = [];
 let currentJobStatus = { status: "idle", warnings: [], output_paths: [] };
 let pendingDeletePresetName = null;
@@ -388,6 +668,7 @@ function renderExtensionChips(kind, selectedValues) {
   const selectedSet = new Set(normalizeExtensionList(selectedValues));
 
   const groups = extensionGroupsByKind[kind];
+  selectedExtensionChips.classList.toggle("is-grouped", Boolean(groups?.length));
   if (groups?.length) {
     for (const group of groups) {
       selectedExtensionChips.append(createExtensionGroup(group, selectedSet));
@@ -464,6 +745,135 @@ function setGroupSelection(groupElement, shouldSelect) {
   for (const chip of groupElement.querySelectorAll(".extension-chip")) {
     chip.classList.toggle("is-selected", shouldSelect);
   }
+}
+
+function localizedValue(value) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value[language] ?? value.ja ?? value.en ?? "";
+  }
+  return value ?? "";
+}
+
+function renderHelpPanel() {
+  renderHelpTabs();
+  renderHelpSection();
+}
+
+function renderHelpTabs() {
+  helpSubtabBar.innerHTML = "";
+  Object.entries(helpSections).forEach(([key, section]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "help-subtab-button";
+    button.dataset.helpSection = key;
+    button.textContent = localizedValue(section.label);
+    button.classList.toggle("is-active", key === activeHelpSection);
+    button.setAttribute("aria-selected", key === activeHelpSection ? "true" : "false");
+    button.addEventListener("click", () => {
+      activeHelpSection = key;
+      renderHelpPanel();
+    });
+    helpSubtabBar.append(button);
+  });
+}
+
+function renderHelpSection() {
+  const section = helpSections[activeHelpSection] || helpSections.quickstart;
+  helpContent.innerHTML = "";
+
+  const header = document.createElement("header");
+  header.className = "help-section-header";
+
+  const title = document.createElement("h3");
+  title.className = "help-section-title";
+  title.textContent = localizedValue(section.title);
+
+  const lead = document.createElement("p");
+  lead.className = "help-section-lead";
+  lead.textContent = localizedValue(section.lead);
+
+  header.append(title, lead);
+  helpContent.append(header);
+
+  const grid = document.createElement("div");
+  grid.className = "help-card-grid";
+
+  for (const card of section.cards || []) {
+    grid.append(createHelpCard(card));
+  }
+
+  helpContent.append(grid);
+}
+
+function createHelpCard(card) {
+  const article = document.createElement("article");
+  article.className = "help-card";
+
+  const title = document.createElement("h4");
+  title.className = "help-card-title";
+  title.textContent = localizedValue(card.title);
+  article.append(title);
+
+  const body = localizedValue(card.body);
+  if (body) {
+    const paragraph = document.createElement("p");
+    paragraph.className = "help-card-body";
+    paragraph.textContent = body;
+    article.append(paragraph);
+  }
+
+  const steps = localizedValue(card.steps);
+  if (Array.isArray(steps) && steps.length > 0) {
+    article.append(createHelpList(steps, true));
+  }
+
+  const items = localizedValue(card.items);
+  if (Array.isArray(items) && items.length > 0) {
+    article.append(createHelpList(items, false));
+  }
+
+  const code = localizedValue(card.code);
+  if (code) {
+    const actions = document.createElement("div");
+    actions.className = "help-card-actions";
+
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "secondary-button help-copy-button";
+    copy.textContent = translations[language].copyPrompt;
+    copy.addEventListener("click", async () => {
+      const original = copy.textContent;
+      try {
+        await navigator.clipboard.writeText(code);
+        copy.textContent = translations[language].copiedPrompt;
+      } catch {
+        copy.textContent = translations[language].copyFailed;
+      }
+      window.setTimeout(() => {
+        copy.textContent = original;
+      }, 1400);
+    });
+    actions.append(copy);
+
+    const pre = document.createElement("pre");
+    pre.className = "help-code";
+    pre.textContent = code.replace(/\\n/g, "\n");
+
+    article.append(actions, pre);
+  }
+
+  return article;
+}
+
+function createHelpList(items, ordered = false) {
+  const list = document.createElement(ordered ? "ol" : "ul");
+  list.className = ordered ? "help-step-list" : "help-list";
+  for (const item of items) {
+    const entry = document.createElement("li");
+    entry.textContent = item;
+    list.append(entry);
+  }
+  return list;
 }
 
 function outputName() {
@@ -807,6 +1217,7 @@ function applyLanguage() {
   }
   updateJobStatusCard(currentJobStatus);
   renderSavedSettings();
+  renderHelpPanel();
   updateActiveKindLabel();
   if (activeKind !== "file-list" && activeKind !== "history" && activeKind !== "settings") {
     saveExtensionState(activeKind);
@@ -819,13 +1230,22 @@ function setActiveKind(kind) {
     saveExtensionState(activeKind);
     jobPanel.classList.add("is-hidden");
     historyPanel.classList.add("is-hidden");
+    helpPanel.classList.add("is-hidden");
     settingsPanel.classList.remove("is-hidden");
   } else if (kind === "history") {
     saveExtensionState(activeKind);
     jobPanel.classList.add("is-hidden");
     settingsPanel.classList.add("is-hidden");
+    helpPanel.classList.add("is-hidden");
     historyPanel.classList.remove("is-hidden");
     fetchHistory();
+  } else if (kind === "help") {
+    saveExtensionState(activeKind);
+    jobPanel.classList.add("is-hidden");
+    settingsPanel.classList.add("is-hidden");
+    historyPanel.classList.add("is-hidden");
+    helpPanel.classList.remove("is-hidden");
+    renderHelpPanel();
   } else {
     const previousKind = activeKind;
     const currentFolderName = outputFolderName.value.trim();
@@ -835,6 +1255,7 @@ function setActiveKind(kind) {
     jobPanel.classList.remove("is-hidden");
     settingsPanel.classList.add("is-hidden");
     historyPanel.classList.add("is-hidden");
+    helpPanel.classList.add("is-hidden");
     imageOutputOptions.classList.toggle("is-hidden", kind !== "image-merge");
     excludeExts.closest(".field").classList.toggle("is-hidden", kind !== "file-list");
     extensionSelectionPanel.classList.toggle("is-hidden", kind === "file-list");
@@ -1230,7 +1651,7 @@ for (const button of tabButtons) {
     const kind = button.dataset.kind;
     if (!kind) return;
     setActiveKind(kind);
-    if (kind !== "settings" && kind !== "history" && !outputFolderName.value.trim()) {
+    if (kind !== "settings" && kind !== "history" && kind !== "help" && !outputFolderName.value.trim()) {
       outputFolderName.value = kinds[kind].stem;
     }
   });
@@ -1274,6 +1695,7 @@ confirmDeleteDialog.addEventListener("click", (event) => {
 async function initialize() {
   await loadGlobalSettings();
   await fetchSavedSettings();
+  renderHelpPanel();
   setActiveKind(activeKind);
   updateJobStatusCard({ status: "idle" });
   checkHealth();
