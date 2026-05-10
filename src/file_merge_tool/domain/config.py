@@ -23,6 +23,18 @@ def normalize_literal_values(
     return tuple(str(value).strip() for value in values or () if str(value).strip())
 
 
+def normalize_path_values(
+    values: list[str | Path] | tuple[str | Path, ...] | None = None,
+) -> tuple[Path, ...]:
+    normalized: list[Path] = []
+    for value in values or ():
+        text = str(value).strip()
+        if not text:
+            continue
+        normalized.append(Path(text))
+    return tuple(normalized)
+
+
 def normalize_regex_values(
     values: list[str] | tuple[str, ...] | None = None,
 ) -> tuple[str, ...]:
@@ -64,6 +76,7 @@ class MergeRequest:
     root_path: Path
     output_dir: Path
     output_name: str
+    source_targets: tuple[Path, ...] = ()
     output_stem: str | None = None
     output_folder_name: str | None = None
     exclude: ExcludeConfig = field(default_factory=ExcludeConfig)
@@ -75,3 +88,11 @@ class MergeRequest:
     sensitivity_markers: tuple[str, ...] = ()
     sensitivity_patterns: tuple[str, ...] = ()
     image_output_formats: tuple[str, ...] = ()
+
+
+def effective_source_targets(request: MergeRequest) -> tuple[Path, ...]:
+    return request.source_targets or (request.root_path,)
+
+
+def primary_source_target(request: MergeRequest) -> Path:
+    return effective_source_targets(request)[0]

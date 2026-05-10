@@ -84,7 +84,7 @@ outputs with the Windows machine's default desktop app when running locally.
 
 ```powershell
 .\scripts\run-cli.ps1 file-list D:\WebServer --output-name file-list.json
-.\scripts\run-cli.ps1 text-merge D:\WebServer --output-name text-merge.json --exclude-dir .git --select-ext .md --select-ext .txt --add-ext .cfg
+.\scripts\run-cli.ps1 text-merge D:\WebServer --source-target D:\Docs\spec.md --output-name text-merge.json --exclude-dir .git --select-ext .md --select-ext .txt --add-ext .cfg
 .\scripts\run-cli.ps1 text-merge D:\WebServer --output-name text-merge.json --exclude-file-regex '^~\$.*'
 .\scripts\run-cli.ps1 image-merge D:\Pictures --output-stem images --format html --format pptx
 .\scripts\run-cli.ps1 pdf-merge D:\Docs --output-stem merged --sensitive-regex 'CONFIDENTIAL'
@@ -95,14 +95,19 @@ outputs with the Windows machine's default desktop app when running locally.
 `file-list` still accepts `--exclude-ext`. All merge commands use
 `--select-ext` and `--add-ext` instead of extension exclusion.
 
+Every command also accepts repeated `--source-target` values. A source target
+can be either a folder or a file. Folder targets are scanned recursively, file
+targets contribute that file only.
+
 ## Collection Rules
 
 - `file-list`:
-  - scans everything under the root path
+  - scans everything under the selected collection paths
   - keeps `exclude_extensions` as an exclusion-based filter
 - Merge jobs:
   - use `selected_extensions` as the main collection rule
   - keep `additional_extensions` separate from the built-in selection list
+  - accept multiple collection paths and keep JSON output grouped by source target
   - record files that were selected but not readable as skipped entries in the
     run summary JSON
 - Literal matching is case-sensitive everywhere

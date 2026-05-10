@@ -1,8 +1,8 @@
 {
   "kind": "file-list",
   "root_path": "D:\\WebServer",
+  "source_targets": ["D:\\WebServer", "D:\\Docs\\spec.md"],
   "output_name": "file-list.json",
   "exclude_dirs": [".git", ".venv", "__pycache__", "node_modules"],
   "exclude_extensions": [".png", ".jpg", ".jpeg", ".gif", ".zip", ".exe", ".dll"]
 }
-

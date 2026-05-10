@@ -133,7 +133,7 @@ const helpSections = {
         steps: {
           ja: [
             "上のタブで、やりたいマージ機能を選びます。",
-            "収集対象ルートフォルダと、必要なら出力フォルダ名や除外条件を整えます。",
+            "収集対象パスを 1 行ずつ入力し、必要なら出力フォルダ名や除外条件を整えます。",
             "実行後は右下の実行結果と、履歴タブの出力ファイルを確認します。",
           ],
           en: [
@@ -274,7 +274,7 @@ const helpSections = {
           ja: [
             "同名保存は上書きではなく、(2), (3) のように採番して追加保存されます。",
             "設定一覧はモーダルで開き、読込と削除をそこから行えます。",
-            "よく使うルートフォルダと判定ルールの組み合わせは、機能ごとに分けて持っておくと整理しやすいです。",
+            "よく使う収集対象パスと判定ルールの組み合わせは、機能ごとに分けて持っておくと整理しやすいです。",
           ],
           en: [
             "Saving with the same name creates numbered copies instead of overwriting the original.",
@@ -417,7 +417,7 @@ const translations = {
     settingName: "設定名",
     outputFolderName: "出力フォルダ名",
     historyRoot: "履歴保存ルート",
-    rootPath: "収集対象ルートフォルダ",
+    rootPath: "収集対象パス",
     excludeDirs: "除外フォルダ",
     excludeExts: "除外拡張子",
     excludeDirPatterns: "除外フォルダ正規表現",
@@ -517,7 +517,7 @@ const translations = {
     settingName: "Setting name",
     outputFolderName: "Output folder name",
     historyRoot: "History root",
-    rootPath: "Collection root folder",
+    rootPath: "Collection paths",
     excludeDirs: "Excluded folders",
     excludeExts: "Excluded extensions",
     excludeDirPatterns: "Excluded folder regex",
@@ -607,6 +607,17 @@ function joinList(value) {
   return (value || []).join(", ");
 }
 
+function splitLines(value) {
+  return String(value || "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function joinLines(value) {
+  return (value || []).join("\n");
+}
+
 function normalizeExtension(value) {
   const trimmed = String(value || "").trim();
   if (!trimmed) return "";
@@ -627,6 +638,10 @@ function normalizeExtensionList(values) {
 
 function defaultSelectedExtensions(kind) {
   return [...(extensionOptionsByKind[kind] || [])];
+}
+
+function currentSourceTargets() {
+  return splitLines(rootPath.value);
 }
 
 function currentSelectedExtensions() {
@@ -915,12 +930,14 @@ function setImageOutputMode(mode) {
 
 function currentFormState() {
   saveExtensionState(activeKind);
+  const sourceTargets = currentSourceTargets();
   return {
     name: settingName.value.trim(),
     kind: activeKind,
     outputFolderName: outputFolderName.value.trim(),
     outputDir: outputDir.value.trim(),
-    rootPath: rootPath.value.trim(),
+    rootPath: sourceTargets[0] || "",
+    sourceTargets,
     excludeDirs: splitList(excludeDirs.value),
     excludeExts: splitList(excludeExts.value),
     excludeDirPatterns: splitList(excludeDirPatterns.value),
@@ -940,7 +957,7 @@ function applyFormState(state) {
   settingName.value = state.name || "";
   outputFolderName.value = state.outputFolderName || state.outputStem || kinds[kind].stem;
   outputDir.value = state.outputDir || "80_workspace\\history";
-  rootPath.value = state.rootPath || "";
+  rootPath.value = joinLines(state.sourceTargets?.length ? state.sourceTargets : [state.rootPath || ""]);
   excludeDirs.value = joinList(state.excludeDirs);
   excludeExts.value = joinList(state.excludeExts || state.excludeExtensions || []);
   excludeDirPatterns.value = joinList(state.excludeDirPatterns);
@@ -1008,10 +1025,17 @@ function buildSavedSettingMeta(item) {
   if (item.outputFolderName) {
     parts.push(item.outputFolderName);
   }
-  if (item.rootPath) {
-    parts.push(item.rootPath);
+  const sourceTargets = item.sourceTargets?.length ? item.sourceTargets : item.rootPath ? [item.rootPath] : [];
+  if (sourceTargets.length === 1) {
+    parts.push(sourceTargets[0]);
+  } else if (sourceTargets.length > 1) {
+    parts.push(formatSourceTargetCount(sourceTargets.length));
   }
   return parts.join(" • ");
+}
+
+function formatSourceTargetCount(count) {
+  return language === "ja" ? `${count} 件のパス` : `${count} paths`;
 }
 
 function formatSavedSettingsCount(count) {
@@ -1315,10 +1339,12 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   jobOutput.textContent = translations[language].submitting;
   updateJobStatusCard({ status: "queued" });
+  const sourceTargets = currentSourceTargets();
 
   const payload = {
     kind: activeKind,
-    root_path: rootPath.value,
+    root_path: sourceTargets[0] || "",
+    source_targets: sourceTargets,
     output_name: outputName(),
     output_stem: outputFolderName.value.trim() || kinds[activeKind].stem,
     output_folder_name: outputFolderName.value.trim() || kinds[activeKind].stem,
@@ -1545,6 +1571,9 @@ function buildHistoryMeta(item, outputCount) {
   }
   if (item.started_at) {
     parts.push(item.started_at);
+  }
+  if (Array.isArray(item.source_targets) && item.source_targets.length > 1) {
+    parts.push(formatSourceTargetCount(item.source_targets.length));
   }
   parts.push(`${outputCount} ${translations[language].summaryOutputs}`);
   return parts.join(" • ");

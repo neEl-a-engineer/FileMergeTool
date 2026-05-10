@@ -10,6 +10,7 @@ from file_merge_tool.domain.merge_job import MergeKind
 class JobCreateRequest(BaseModel):
     kind: MergeKind = Field(default=MergeKind.FILE_LIST)
     root_path: Path
+    source_targets: list[Path] = Field(default_factory=list)
     output_dir: Path | None = None
     output_stem: str | None = None
     output_folder_name: str | None = None

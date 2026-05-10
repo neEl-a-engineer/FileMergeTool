@@ -12,6 +12,7 @@ from file_merge_tool.domain.config import (
     MergeRequest,
     normalize_extension_values,
     normalize_literal_values,
+    normalize_path_values,
     normalize_regex_values,
 )
 from file_merge_tool.domain.extension_selection import default_selected_extensions
@@ -42,11 +43,14 @@ def _request(
     exclude_dir_pattern: list[str] | None = None,
     exclude_file_pattern: list[str] | None = None,
     image_format: list[str] | None = None,
+    source_target: list[Path] | None = None,
 ) -> MergeRequest:
+    source_targets = normalize_path_values(source_target) or (root_path,)
     return MergeRequest(
-        root_path=root_path,
+        root_path=source_targets[0],
         output_dir=output_dir.resolve() if output_dir else default_output_dir(),
         output_name=output_name,
+        source_targets=source_targets,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
         exclude=ExcludeConfig.from_iterables(
@@ -97,6 +101,7 @@ def _now() -> str:
 @app.command("file-list")
 def file_list(
     root_path: Annotated[Path, typer.Argument(help="Root folder to scan.")],
+    source_target: Annotated[list[Path], typer.Option("--source-target", help="Additional collection path. Can be a folder or a file.")] = None,
     output_dir: Annotated[Path | None, typer.Option("--output-dir")] = None,
     output_name: Annotated[str, typer.Option("--output-name", "-o")] = "file-list.json",
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
@@ -119,6 +124,7 @@ def file_list(
         kind=MergeKind.FILE_LIST,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
+        source_target=source_target,
     )
     _run_and_print(MergeKind.FILE_LIST, request)
 
@@ -126,6 +132,7 @@ def file_list(
 @app.command("text-merge")
 def text_merge(
     root_path: Annotated[Path, typer.Argument(help="Root folder to scan.")],
+    source_target: Annotated[list[Path], typer.Option("--source-target", help="Additional collection path. Can be a folder or a file.")] = None,
     output_dir: Annotated[Path | None, typer.Option("--output-dir")] = None,
     output_name: Annotated[str, typer.Option("--output-name", "-o")] = "text-merge.json",
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
@@ -151,6 +158,7 @@ def text_merge(
         kind=MergeKind.TEXT_MERGE,
         output_stem=output_stem,
         output_folder_name=output_folder_name,
+        source_target=source_target,
     )
     _run_and_print(MergeKind.TEXT_MERGE, request)
 
@@ -158,6 +166,7 @@ def text_merge(
 @app.command("mail-merge")
 def mail_merge(
     root_path: Annotated[Path, typer.Argument(help="Root folder to scan.")],
+    source_target: Annotated[list[Path], typer.Option("--source-target", help="Additional collection path. Can be a folder or a file.")] = None,
     output_dir: Annotated[Path | None, typer.Option("--output-dir")] = None,
     output_name: Annotated[str, typer.Option("--output-name", "-o")] = "mail-merge.json",
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
@@ -187,6 +196,7 @@ def mail_merge(
         additional_ext=additional_ext,
         exclude_dir_pattern=exclude_dir_pattern or [],
         exclude_file_pattern=exclude_file_pattern or [],
+        source_target=source_target,
     )
     _run_and_print(MergeKind.MAIL_MERGE, request)
 
@@ -194,6 +204,7 @@ def mail_merge(
 @app.command("powerpoint-merge")
 def powerpoint_merge(
     root_path: Annotated[Path, typer.Argument(help="Root folder to scan.")],
+    source_target: Annotated[list[Path], typer.Option("--source-target", help="Additional collection path. Can be a folder or a file.")] = None,
     output_dir: Annotated[Path | None, typer.Option("--output-dir")] = None,
     output_name: Annotated[str, typer.Option("--output-name", "-o")] = "merged.pptx",
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
@@ -223,6 +234,7 @@ def powerpoint_merge(
         additional_ext=additional_ext,
         exclude_dir_pattern=exclude_dir_pattern or [],
         exclude_file_pattern=exclude_file_pattern or [],
+        source_target=source_target,
     )
     _run_and_print(MergeKind.POWERPOINT_MERGE, request)
 
@@ -230,6 +242,7 @@ def powerpoint_merge(
 @app.command("excel-merge")
 def excel_merge(
     root_path: Annotated[Path, typer.Argument(help="Root folder to scan.")],
+    source_target: Annotated[list[Path], typer.Option("--source-target", help="Additional collection path. Can be a folder or a file.")] = None,
     output_dir: Annotated[Path | None, typer.Option("--output-dir")] = None,
     output_name: Annotated[str, typer.Option("--output-name", "-o")] = "merged.xlsx",
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
@@ -259,6 +272,7 @@ def excel_merge(
         additional_ext=additional_ext,
         exclude_dir_pattern=exclude_dir_pattern or [],
         exclude_file_pattern=exclude_file_pattern or [],
+        source_target=source_target,
     )
     _run_and_print(MergeKind.EXCEL_MERGE, request)
 
@@ -266,6 +280,7 @@ def excel_merge(
 @app.command("word-merge")
 def word_merge(
     root_path: Annotated[Path, typer.Argument(help="Root folder to scan.")],
+    source_target: Annotated[list[Path], typer.Option("--source-target", help="Additional collection path. Can be a folder or a file.")] = None,
     output_dir: Annotated[Path | None, typer.Option("--output-dir")] = None,
     output_name: Annotated[str, typer.Option("--output-name", "-o")] = "merged.docx",
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
@@ -295,6 +310,7 @@ def word_merge(
         additional_ext=additional_ext,
         exclude_dir_pattern=exclude_dir_pattern or [],
         exclude_file_pattern=exclude_file_pattern or [],
+        source_target=source_target,
     )
     _run_and_print(MergeKind.WORD_MERGE, request)
 
@@ -302,6 +318,7 @@ def word_merge(
 @app.command("pdf-merge")
 def pdf_merge(
     root_path: Annotated[Path, typer.Argument(help="Root folder to scan.")],
+    source_target: Annotated[list[Path], typer.Option("--source-target", help="Additional collection path. Can be a folder or a file.")] = None,
     output_dir: Annotated[Path | None, typer.Option("--output-dir")] = None,
     output_name: Annotated[str, typer.Option("--output-name", "-o")] = "merged.pdf",
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
@@ -331,6 +348,7 @@ def pdf_merge(
         additional_ext=additional_ext,
         exclude_dir_pattern=exclude_dir_pattern or [],
         exclude_file_pattern=exclude_file_pattern or [],
+        source_target=source_target,
     )
     _run_and_print(MergeKind.PDF_MERGE, request)
 
@@ -338,6 +356,7 @@ def pdf_merge(
 @app.command("image-merge")
 def image_merge(
     root_path: Annotated[Path, typer.Argument(help="Root folder to scan.")],
+    source_target: Annotated[list[Path], typer.Option("--source-target", help="Additional collection path. Can be a folder or a file.")] = None,
     output_dir: Annotated[Path | None, typer.Option("--output-dir")] = None,
     output_name: Annotated[str, typer.Option("--output-name", "-o")] = "images.html",
     output_stem: Annotated[str | None, typer.Option("--output-stem")] = None,
@@ -370,6 +389,7 @@ def image_merge(
         exclude_dir_pattern=exclude_dir_pattern or [],
         exclude_file_pattern=exclude_file_pattern or [],
         image_format=formats,
+        source_target=source_target,
     )
     _run_and_print(MergeKind.IMAGE_MERGE, request)
 

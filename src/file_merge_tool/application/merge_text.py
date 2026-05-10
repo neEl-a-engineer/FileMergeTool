@@ -10,22 +10,30 @@ from file_merge_tool.domain.artifact import (
     model_to_dict,
 )
 from file_merge_tool.application.output_files import merge_output_path
+from file_merge_tool.application.source_target_reporting import (
+    build_target_level_file_results,
+    build_target_level_skipped_items,
+)
+from file_merge_tool.application.target_groups import build_target_item_groups
 from file_merge_tool.domain.config import MergeRequest
 from file_merge_tool.domain.extension_selection import is_extension_selected
 from file_merge_tool.domain.result import FileResult, MergeResult
 from file_merge_tool.extractors.text_extractor import extract_text
-from file_merge_tool.scanning.walker import walk_tree
+from file_merge_tool.scanning.source_targets import flatten_scanned_items, scan_source_targets
 from file_merge_tool.writers.json_writer import write_json
 
 
 def merge_text(request: MergeRequest) -> MergeResult:
-    scanned_items = list(walk_tree(request.root_path, request.exclude))
+    target_scans = scan_source_targets(request.source_targets or (request.root_path,), request.exclude)
+    scanned_items = flatten_scanned_items(target_scans)
     files: list[dict[str, Any]] = []
     warnings: list[WarningItem] = []
     skipped_items: list[SkippedItem] = []
-    file_results: list[FileResult] = []
+    file_results: list[FileResult] = build_target_level_file_results(target_scans)
     skipped_count = 0
     error_skipped_count = 0
+    skipped_items.extend(build_target_level_skipped_items(target_scans))
+    skipped_count += len(skipped_items)
 
     for item in scanned_items:
         if item.kind != "file":
@@ -36,6 +44,8 @@ def merge_text(request: MergeRequest) -> MergeResult:
                         relative_path=item.relative_path,
                         kind=item.kind,
                         reason=item.excluded_reason or "skipped",
+                        source_target_path=item.source_target_path,
+                        source_target_kind=item.source_target_kind,
                         absolute_path=str(item.absolute_path),
                         link_target=item.link_target,
                     )
@@ -44,6 +54,8 @@ def merge_text(request: MergeRequest) -> MergeResult:
                     FileResult(
                         relative_path=item.relative_path,
                         source_path=str(item.absolute_path),
+                        source_target_path=item.source_target_path,
+                        source_target_kind=item.source_target_kind,
                         status="skipped",
                         skip_reason=item.excluded_reason or "skipped",
                         details="The path matched an exclusion rule during traversal.",
@@ -57,6 +69,8 @@ def merge_text(request: MergeRequest) -> MergeResult:
                     relative_path=item.relative_path,
                     kind=item.kind,
                     reason=item.excluded_reason or "excluded",
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     absolute_path=str(item.absolute_path),
                 )
             )
@@ -64,6 +78,8 @@ def merge_text(request: MergeRequest) -> MergeResult:
                 FileResult(
                     relative_path=item.relative_path,
                     source_path=str(item.absolute_path),
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     status="skipped",
                     skip_reason=item.excluded_reason or "excluded",
                     details="The file matched an exclusion rule.",
@@ -82,6 +98,8 @@ def merge_text(request: MergeRequest) -> MergeResult:
                     relative_path=item.relative_path,
                     kind=item.kind,
                     reason="extension_not_selected",
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     absolute_path=str(item.absolute_path),
                 )
             )
@@ -89,6 +107,8 @@ def merge_text(request: MergeRequest) -> MergeResult:
                 FileResult(
                     relative_path=item.relative_path,
                     source_path=str(item.absolute_path),
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     status="skipped",
                     skip_reason="extension_not_selected",
                     details="The file extension is not selected for this merge run.",
@@ -106,6 +126,8 @@ def merge_text(request: MergeRequest) -> MergeResult:
                     relative_path=item.relative_path,
                     kind=item.kind,
                     reason="read_error",
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     absolute_path=str(item.absolute_path),
                     link_target=None,
                 )
@@ -115,6 +137,8 @@ def merge_text(request: MergeRequest) -> MergeResult:
                     relative_path=item.relative_path,
                     reason="read_error",
                     message="Skipped because the file could not be read.",
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     exception_type=exc.__class__.__name__,
                 )
             )
@@ -122,6 +146,8 @@ def merge_text(request: MergeRequest) -> MergeResult:
                 FileResult(
                     relative_path=item.relative_path,
                     source_path=str(item.absolute_path),
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     status="error",
                     skip_reason="read_error",
                     exception_type=exc.__class__.__name__,
@@ -135,6 +161,9 @@ def merge_text(request: MergeRequest) -> MergeResult:
             {
                 "absolute_path": str(item.absolute_path),
                 "relative_path": item.relative_path,
+                "relative_path_from_target": item.relative_path_from_target,
+                "source_target_path": item.source_target_path,
+                "source_target_kind": item.source_target_kind,
                 "modified_at": item.modified_at,
                 "encoding": extracted.encoding,
                 "line_count": len(extracted.lines),
@@ -149,6 +178,8 @@ def merge_text(request: MergeRequest) -> MergeResult:
             FileResult(
                 relative_path=item.relative_path,
                 source_path=str(item.absolute_path),
+                source_target_path=item.source_target_path,
+                source_target_kind=item.source_target_kind,
                 status="merged",
                 classification="normal",
             )
@@ -168,7 +199,12 @@ def merge_text(request: MergeRequest) -> MergeResult:
             error_skipped_count=error_skipped_count,
             warning_count=len(warnings),
         ).dict(),
-        "items": files,
+        "items": build_target_item_groups(
+            target_scans,
+            merged_items=files,
+            skipped_items=skipped_items,
+            warnings=warnings,
+        ),
         "skipped_items": [model_to_dict(item, exclude_none=True) for item in skipped_items],
         "warnings": [model_to_dict(item, exclude_none=True) for item in warnings],
     }

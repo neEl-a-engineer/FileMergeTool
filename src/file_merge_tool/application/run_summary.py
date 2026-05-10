@@ -52,6 +52,7 @@ def build_run_summary_payload(
         },
         "settings": {
             "root_folder": str(request.root_path),
+            "source_targets": [str(path) for path in request.source_targets or (request.root_path,)],
             "output_folder_name": request.output_folder_name,
             "selected_extensions": list(request.selected_extensions),
             "additional_extensions": list(request.additional_extensions),
@@ -77,6 +78,8 @@ def build_run_summary_payload(
             {
                 "source_path": item.source_path,
                 "relative_path": item.relative_path,
+                "source_target_path": item.source_target_path,
+                "source_target_kind": item.source_target_kind,
                 "status": item.status,
                 "classification": item.classification,
                 "skip_reason": item.skip_reason,
@@ -90,6 +93,8 @@ def build_run_summary_payload(
             {
                 "source_path": item.source_path,
                 "relative_path": item.relative_path,
+                "source_target_path": item.source_target_path,
+                "source_target_kind": item.source_target_kind,
                 "exception_type": item.exception_type,
                 "message": item.message,
                 "details": item.details,

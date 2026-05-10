@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 from file_merge_tool.application.merge_text import merge_text
 from file_merge_tool.domain.config import ExcludeConfig, MergeRequest
@@ -70,3 +71,35 @@ def test_text_merge_excludes_by_file_pattern(tmp_path: Path) -> None:
         item.relative_path == "~$draft.txt" and item.skip_reason == "excluded_file_pattern"
         for item in result.file_results
     )
+
+
+def test_text_merge_groups_items_by_source_target_and_records_missing_target(tmp_path: Path) -> None:
+    root_a = tmp_path / "root-a"
+    root_b = tmp_path / "root-b"
+    missing = tmp_path / "missing.txt"
+    root_a.mkdir()
+    root_b.mkdir()
+    (root_a / "a.txt").write_text("one\n", encoding="utf-8")
+    (root_b / "b.txt").write_text("two\n", encoding="utf-8")
+
+    request = MergeRequest(
+        root_path=root_a,
+        source_targets=(root_a, root_b, missing),
+        output_dir=tmp_path / "out",
+        output_name="merged.json",
+        kind="text-merge",
+        exclude=ExcludeConfig(),
+        selected_extensions=(".txt",),
+    )
+
+    result = merge_text(request)
+    payload = json.loads(result.output_paths[0].read_text(encoding="utf-8"))
+
+    assert payload["header"]["source_targets"] == [str(root_a), str(root_b), str(missing)]
+    assert len(payload["items"]) == 3
+    assert payload["items"][0]["source_target_path"] == str(root_a.resolve())
+    assert payload["items"][0]["items"][0]["relative_path"] == "a.txt"
+    assert payload["items"][1]["source_target_path"] == str(root_b.resolve())
+    assert payload["items"][1]["items"][0]["relative_path"] == "b.txt"
+    assert payload["items"][2]["reason"] == "path_not_found"
+    assert any(item.skip_reason == "path_not_found" for item in result.file_results)

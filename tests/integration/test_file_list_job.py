@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 from file_merge_tool.application.create_file_list import create_file_list
 from file_merge_tool.domain.config import ExcludeConfig, MergeRequest
@@ -111,3 +112,35 @@ def test_file_list_records_symlink_without_following(tmp_path: Path) -> None:
     assert '"kind": "symlink"' in output
     assert '"excluded_reason": "symlink_not_followed"' in output
     assert "hidden.txt" not in output
+
+
+def test_file_list_groups_by_source_target_and_marks_covered_descendants(tmp_path: Path) -> None:
+    folder = tmp_path / "folder"
+    nested = folder / "nested"
+    nested.mkdir(parents=True)
+    target_file = nested / "sample.txt"
+    target_file.write_text("sample", encoding="utf-8")
+
+    request = MergeRequest(
+        root_path=folder,
+        source_targets=(target_file, folder),
+        output_dir=tmp_path / "out",
+        output_name="file-list.json",
+        exclude=ExcludeConfig(),
+    )
+
+    result = create_file_list(request)
+    payload = json.loads(result.output_paths[0].read_text(encoding="utf-8"))
+
+    assert len(payload["items"]) == 2
+    assert payload["items"][0]["source_target_kind"] == "file"
+    assert payload["items"][0]["items"][0]["relative_path"] == "."
+    folder_group = payload["items"][1]
+    covered = [
+        item
+        for item in folder_group["items"]
+        if item["relative_path"] == "nested/sample.txt"
+    ]
+    assert covered
+    assert covered[0]["excluded_reason"] == "covered_by_previous_target"
+    assert any(item.skip_reason == "covered_by_previous_target" for item in result.file_results)

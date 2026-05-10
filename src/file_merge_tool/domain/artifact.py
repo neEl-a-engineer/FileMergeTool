@@ -46,6 +46,7 @@ class ArtifactHeader(BaseModel):
     classification: str = "normal"
     generated_at: str
     source_root: str
+    source_targets: list[str] = Field(default_factory=list)
     setting_name: str | None = None
     traversal: TraversalInfo = Field(default_factory=TraversalInfo)
     collection: CollectionInfo
@@ -65,6 +66,8 @@ class WarningItem(BaseModel):
     relative_path: str
     reason: str
     message: str
+    source_target_path: str | None = None
+    source_target_kind: str | None = None
     exception_type: str | None = None
 
 
@@ -72,6 +75,8 @@ class SkippedItem(BaseModel):
     relative_path: str
     kind: str
     reason: str
+    source_target_path: str | None = None
+    source_target_kind: str | None = None
     absolute_path: str | None = None
     link_target: str | None = None
 
@@ -96,6 +101,7 @@ def build_artifact_header(
         classification=classification,
         generated_at=datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
         source_root=str(request.root_path.resolve()),
+        source_targets=[str(path) for path in request.source_targets or (request.root_path,)],
         setting_name=request.setting_name,
         collection=CollectionInfo(
             selected_extensions=list(request.selected_extensions),

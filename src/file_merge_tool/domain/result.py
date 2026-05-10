@@ -9,6 +9,8 @@ class FileResult:
     relative_path: str
     source_path: str
     status: str
+    source_target_path: str | None = None
+    source_target_kind: str | None = None
     classification: str | None = None
     skip_reason: str | None = None
     exception_type: str | None = None

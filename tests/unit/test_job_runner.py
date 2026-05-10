@@ -50,3 +50,24 @@ def test_build_request_ignores_exclude_extensions_for_merge_jobs(tmp_path: Path)
     assert request.exclude.extensions == ()
     assert request.selected_extensions == (".txt",)
     assert request.additional_extensions == (".cfg",)
+
+
+def test_build_request_uses_source_targets_when_present(tmp_path: Path) -> None:
+    first = tmp_path / "root-a"
+    second = tmp_path / "root-b" / "target.txt"
+    payload = JobCreateRequest(
+        kind=MergeKind.TEXT_MERGE,
+        root_path=tmp_path / "legacy-root",
+        source_targets=[first, second],
+        output_name="text.json",
+        selected_extensions=[".txt"],
+    )
+
+    request = _build_request(
+        payload=payload,
+        output_dir=tmp_path / "out",
+        output_folder_name="text-run",
+    )
+
+    assert request.root_path == first
+    assert request.source_targets == (first, second)

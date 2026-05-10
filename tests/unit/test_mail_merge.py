@@ -57,9 +57,9 @@ def test_mail_merge_writes_normal_and_sensitive_json(
     ]
     normal = json.loads(result.output_paths[0].read_text(encoding="utf-8"))
     sensitive = json.loads(result.output_paths[1].read_text(encoding="utf-8"))
-    assert normal["items"][0]["subject"] == "Open memo"
-    assert sensitive["items"][0]["attachment_names"] == ["plan.xlsx"]
-    assert sensitive["items"][0]["sensitivity"]["matched_markers"] == ["\u6975\u79d8"]
+    assert normal["items"][0]["items"][0]["subject"] == "Open memo"
+    assert sensitive["items"][0]["items"][0]["attachment_names"] == ["plan.xlsx"]
+    assert sensitive["items"][0]["items"][0]["sensitivity"]["matched_markers"] == ["\u6975\u79d8"]
 
 
 def test_mail_merge_classifies_only_subject_or_first_three_non_empty_body_lines(
@@ -97,4 +97,5 @@ def test_mail_merge_classifies_only_subject_or_first_three_non_empty_body_lines(
 
     assert result.item_count == 1
     assert len(normal["items"]) == 1
-    assert sensitive["items"] == []
+    assert len(normal["items"][0]["items"]) == 1
+    assert sensitive["items"][0]["items"] == []

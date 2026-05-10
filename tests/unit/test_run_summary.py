@@ -68,6 +68,7 @@ def test_run_summary_includes_extension_and_error_details(tmp_path: Path) -> Non
     )
 
     assert payload["settings"]["selected_extensions"] == [".txt", ".md"]
+    assert payload["settings"]["source_targets"] == [str(tmp_path / "root")]
     assert payload["settings"]["additional_extensions"] == [".cfg"]
     assert payload["settings"]["effective_extensions"] == [".txt", ".md", ".cfg"]
     assert payload["settings"]["exclude_folder_patterns"] == [r"^Build\d+$"]

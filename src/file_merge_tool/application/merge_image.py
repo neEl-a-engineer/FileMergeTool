@@ -11,13 +11,17 @@ from file_merge_tool.domain.artifact import (
     model_to_dict,
 )
 from file_merge_tool.application.output_files import merge_output_path
+from file_merge_tool.application.source_target_reporting import (
+    build_target_level_file_results,
+    build_target_level_skipped_items,
+)
 from file_merge_tool.domain.config import MergeRequest
 from file_merge_tool.domain.extension_selection import is_extension_selected
 from file_merge_tool.domain.result import FileResult, MergeResult
 from file_merge_tool.domain.rule_matching import matched_literal_substrings, matched_regex_patterns
 from file_merge_tool.domain.sensitivity import SENSITIVE_MARKERS
 from file_merge_tool.extractors.image_extractor import extract_image_file, is_image_file
-from file_merge_tool.scanning.walker import walk_tree
+from file_merge_tool.scanning.source_targets import flatten_scanned_items, scan_source_targets
 from file_merge_tool.writers.image_html_writer import write_image_html_report
 from file_merge_tool.writers.image_powerpoint_writer import write_image_powerpoint
 
@@ -30,13 +34,14 @@ def merge_image(request: MergeRequest) -> MergeResult:
             f"Unsupported image output format: {', '.join(unsupported)}"
         )
 
-    scanned_items = list(walk_tree(request.root_path, request.exclude))
+    target_scans = scan_source_targets(request.source_targets or (request.root_path,), request.exclude)
+    scanned_items = flatten_scanned_items(target_scans)
     normal_items: list[dict[str, Any]] = []
     sensitive_items: list[dict[str, Any]] = []
-    skipped_items: list[SkippedItem] = []
+    skipped_items: list[SkippedItem] = build_target_level_skipped_items(target_scans)
     warnings: list[WarningItem] = []
-    file_results: list[FileResult] = []
-    skipped_count = 0
+    file_results: list[FileResult] = build_target_level_file_results(target_scans)
+    skipped_count = len(skipped_items)
     error_skipped_count = 0
 
     markers = _sensitivity_markers(request)
@@ -45,11 +50,13 @@ def merge_image(request: MergeRequest) -> MergeResult:
         if item.kind != "file":
             if item.excluded:
                 skipped_count += 1
-                skipped_items.append(_skipped_item(item.relative_path, item.kind, item.excluded_reason or "skipped", item.absolute_path, item.link_target))
+                skipped_items.append(_skipped_item(item.relative_path, item.kind, item.excluded_reason or "skipped", item.source_target_path, item.source_target_kind, item.absolute_path, item.link_target))
                 file_results.append(
                     FileResult(
                         relative_path=item.relative_path,
                         source_path=str(item.absolute_path),
+                        source_target_path=item.source_target_path,
+                        source_target_kind=item.source_target_kind,
                         status="skipped",
                         skip_reason=item.excluded_reason or "skipped",
                         details="The path matched an exclusion rule during traversal.",
@@ -59,11 +66,13 @@ def merge_image(request: MergeRequest) -> MergeResult:
 
         if item.excluded:
             skipped_count += 1
-            skipped_items.append(_skipped_item(item.relative_path, item.kind, item.excluded_reason or "excluded", item.absolute_path, item.link_target))
+            skipped_items.append(_skipped_item(item.relative_path, item.kind, item.excluded_reason or "excluded", item.source_target_path, item.source_target_kind, item.absolute_path, item.link_target))
             file_results.append(
                 FileResult(
                     relative_path=item.relative_path,
                     source_path=str(item.absolute_path),
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     status="skipped",
                     skip_reason=item.excluded_reason or "excluded",
                     details="The file matched an exclusion rule.",
@@ -78,11 +87,13 @@ def merge_image(request: MergeRequest) -> MergeResult:
             kind=request.kind or "image-merge",
         ):
             skipped_count += 1
-            skipped_items.append(_skipped_item(item.relative_path, item.kind, "extension_not_selected", item.absolute_path, None))
+            skipped_items.append(_skipped_item(item.relative_path, item.kind, "extension_not_selected", item.source_target_path, item.source_target_kind, item.absolute_path, None))
             file_results.append(
                 FileResult(
                     relative_path=item.relative_path,
                     source_path=str(item.absolute_path),
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     status="skipped",
                     skip_reason="extension_not_selected",
                     details="The file extension is not selected for this merge run.",
@@ -92,11 +103,13 @@ def merge_image(request: MergeRequest) -> MergeResult:
 
         if not is_image_file(item.absolute_path):
             skipped_count += 1
-            skipped_items.append(_skipped_item(item.relative_path, item.kind, "reader_not_available", item.absolute_path, None))
+            skipped_items.append(_skipped_item(item.relative_path, item.kind, "reader_not_available", item.source_target_path, item.source_target_kind, item.absolute_path, None))
             file_results.append(
                 FileResult(
                     relative_path=item.relative_path,
                     source_path=str(item.absolute_path),
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     status="skipped",
                     skip_reason="reader_not_available",
                     details="The file extension is selected, but no image reader is available for it.",
@@ -109,12 +122,14 @@ def merge_image(request: MergeRequest) -> MergeResult:
         except Exception as exc:  # noqa: BLE001
             skipped_count += 1
             error_skipped_count += 1
-            skipped_items.append(_skipped_item(item.relative_path, item.kind, "read_error", item.absolute_path, None))
+            skipped_items.append(_skipped_item(item.relative_path, item.kind, "read_error", item.source_target_path, item.source_target_kind, item.absolute_path, None))
             warnings.append(
                 WarningItem(
                     relative_path=item.relative_path,
                     reason="read_error",
                     message="Skipped because the image file could not be read.",
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     exception_type=exc.__class__.__name__,
                 )
             )
@@ -122,6 +137,8 @@ def merge_image(request: MergeRequest) -> MergeResult:
                 FileResult(
                     relative_path=item.relative_path,
                     source_path=str(item.absolute_path),
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     status="error",
                     skip_reason="read_error",
                     exception_type=exc.__class__.__name__,
@@ -136,6 +153,9 @@ def merge_image(request: MergeRequest) -> MergeResult:
             "id": f"item-{len(normal_items) + len(sensitive_items) + 1:04d}",
             "absolute_path": str(item.absolute_path),
             "relative_path": item.relative_path,
+            "relative_path_from_target": item.relative_path_from_target,
+            "source_target_path": item.source_target_path,
+            "source_target_kind": item.source_target_kind,
             "modified_at": item.modified_at,
             "mime_type": extracted.mime_type,
             "width": extracted.width,
@@ -153,6 +173,8 @@ def merge_image(request: MergeRequest) -> MergeResult:
                 FileResult(
                     relative_path=item.relative_path,
                     source_path=str(item.absolute_path),
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     status="merged",
                     classification="confidential",
                 )
@@ -163,6 +185,8 @@ def merge_image(request: MergeRequest) -> MergeResult:
                 FileResult(
                     relative_path=item.relative_path,
                     source_path=str(item.absolute_path),
+                    source_target_path=item.source_target_path,
+                    source_target_kind=item.source_target_kind,
                     status="merged",
                     classification="normal",
                 )
@@ -346,6 +370,8 @@ def _skipped_item(
     relative_path: str,
     kind: str,
     reason: str,
+    source_target_path: str,
+    source_target_kind: str,
     absolute_path: Path,
     link_target: str | None,
 ) -> SkippedItem:
@@ -353,6 +379,8 @@ def _skipped_item(
         relative_path=relative_path,
         kind=kind,
         reason=reason,
+        source_target_path=source_target_path,
+        source_target_kind=source_target_kind,
         absolute_path=str(absolute_path),
         link_target=link_target,
     )

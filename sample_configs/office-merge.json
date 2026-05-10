@@ -1,6 +1,7 @@
 {
   "kind": "powerpoint-merge",
   "root_path": "D:\\WebServer",
+  "source_targets": ["D:\\WebServer", "D:\\Slides\\intro.pptx"],
   "output_name": "merged.pptx",
   "exclude_dirs": [".git", ".venv", "__pycache__", "node_modules"],
   "exclude_files": ["Thumbs.db"],

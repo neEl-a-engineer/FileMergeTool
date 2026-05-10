@@ -19,6 +19,7 @@ from file_merge_tool.domain.config import (
     MergeRequest,
     normalize_extension_values,
     normalize_literal_values,
+    normalize_path_values,
     normalize_regex_values,
 )
 from file_merge_tool.domain.extension_selection import default_selected_extensions
@@ -30,10 +31,11 @@ from file_merge_tool.infrastructure.output_metadata import build_output_record
 
 def submit_job(payload: JobCreateRequest, background_tasks: BackgroundTasks) -> JobRecord:
     job_id = uuid4().hex
+    source_targets = normalize_path_values(payload.source_targets) or (Path(payload.root_path),)
     record = JobRecord(
         id=job_id,
         kind=payload.kind.value,
-        root_path=str(payload.root_path),
+        root_path=str(source_targets[0]),
         setting_name=payload.setting_name,
     )
     put_job(record)
@@ -61,6 +63,7 @@ def _run_job(job_id: str, payload: JobCreateRequest) -> None:
             root_path=Path(payload.root_path),
             output_dir=history_dir,
             output_name=_default_output_name(payload.kind),
+            source_targets=normalize_path_values(payload.source_targets),
             output_folder_name=resolved_output_folder_name,
             kind=payload.kind.value,
             setting_name=payload.setting_name,
@@ -174,13 +177,15 @@ def _build_request(
         else normalize_extension_values(payload.selected_extensions) or default_selected_extensions(payload.kind.value)
     )
     additional_extensions = [] if payload.kind == MergeKind.FILE_LIST else payload.additional_extensions
+    source_targets = normalize_path_values(payload.source_targets) or (Path(payload.root_path),)
     return MergeRequest(
-        root_path=Path(payload.root_path),
+        root_path=source_targets[0],
         output_dir=output_dir,
         output_name=ensure_safe_output_name(
             payload.output_name or "",
             _default_output_name(payload.kind),
         ),
+        source_targets=source_targets,
         output_stem=payload.output_stem,
         output_folder_name=output_folder_name,
         exclude=ExcludeConfig.from_iterables(
@@ -202,10 +207,12 @@ def _build_request(
 
 
 def _resolve_output_folder_name(payload: JobCreateRequest) -> str:
+    source_targets = normalize_path_values(payload.source_targets) or (Path(payload.root_path),)
     request = MergeRequest(
-        root_path=Path(payload.root_path),
+        root_path=source_targets[0],
         output_dir=default_output_dir(),
         output_name=_default_output_name(payload.kind),
+        source_targets=source_targets,
         output_stem=payload.output_stem,
         output_folder_name=payload.output_folder_name,
     )
@@ -245,6 +252,7 @@ def _manifest(
         "finished_at": finished_at,
         "setting_name": request.setting_name,
         "source_root": str(request.root_path),
+        "source_targets": [str(path) for path in request.source_targets or (request.root_path,)],
         "history_dir": str(history_dir),
         "output_folder_name": request.output_folder_name,
         "outputs": outputs,
@@ -253,6 +261,7 @@ def _manifest(
             "output_name": request.output_name,
             "output_folder_name": request.output_folder_name,
             "image_output_formats": list(request.image_output_formats),
+            "source_targets": [str(path) for path in request.source_targets or (request.root_path,)],
             "selected_extensions": list(request.selected_extensions),
             "additional_extensions": list(request.additional_extensions),
             "exclude_dirs": list(request.exclude.folder_names),

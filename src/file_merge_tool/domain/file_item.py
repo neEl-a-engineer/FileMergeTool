@@ -8,6 +8,9 @@ from pathlib import Path
 class ScannedItem:
     absolute_path: Path
     relative_path: str
+    relative_path_from_target: str
+    source_target_path: str
+    source_target_kind: str
     kind: str
     modified_at: str | None
     excluded: bool = False
