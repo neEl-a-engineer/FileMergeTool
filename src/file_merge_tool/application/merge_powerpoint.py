@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from file_merge_tool.application.merge_recovery import apply_write_report
 from file_merge_tool.application.output_files import merge_output_path
 from file_merge_tool.application.source_target_reporting import (
     build_target_level_file_results,
@@ -18,6 +19,7 @@ from file_merge_tool.domain.artifact import (
 )
 from file_merge_tool.domain.config import MergeRequest
 from file_merge_tool.domain.extension_selection import effective_selected_extensions, is_extension_selected
+from file_merge_tool.domain.recovery import coerce_write_report
 from file_merge_tool.domain.result import FileResult, MergeResult
 from file_merge_tool.domain.rule_matching import matched_literal_substrings, matched_regex_patterns
 from file_merge_tool.domain.sensitivity import SENSITIVE_MARKERS
@@ -201,16 +203,38 @@ def merge_powerpoint(request: MergeRequest) -> MergeResult:
         classification="sensitive",
     )
 
-    write_powerpoint_merge(
-        normal_pptx,
-        header_lines=_header_lines(request, "normal", normal_sources, skipped_count, warnings),
+    normal_report = coerce_write_report(
+        write_powerpoint_merge(
+            normal_pptx,
+            header_lines=_header_lines(request, "normal", normal_sources, skipped_count, warnings),
+            sources=normal_sources,
+        ),
+        normal_sources,
+    )
+    sensitive_report = coerce_write_report(
+        write_powerpoint_merge(
+            sensitive_pptx,
+            header_lines=_header_lines(request, "sensitive", sensitive_sources, skipped_count, warnings),
+            sources=sensitive_sources,
+        ),
+        sensitive_sources,
+    )
+    normal_sources, normal_skipped, normal_error_skipped = apply_write_report(
         sources=normal_sources,
+        report=normal_report,
+        warnings=warnings,
+        skipped_items=skipped_items,
+        file_results=file_results,
     )
-    write_powerpoint_merge(
-        sensitive_pptx,
-        header_lines=_header_lines(request, "sensitive", sensitive_sources, skipped_count, warnings),
+    sensitive_sources, sensitive_skipped, sensitive_error_skipped = apply_write_report(
         sources=sensitive_sources,
+        report=sensitive_report,
+        warnings=warnings,
+        skipped_items=skipped_items,
+        file_results=file_results,
     )
+    skipped_count += normal_skipped + sensitive_skipped
+    error_skipped_count += normal_error_skipped + sensitive_error_skipped
     _write_merge_json(
         request=request,
         output_path=normal_json,
@@ -237,7 +261,7 @@ def merge_powerpoint(request: MergeRequest) -> MergeResult:
     )
 
     return MergeResult(
-        output_paths=(normal_pptx, sensitive_pptx, normal_json, sensitive_json),
+        output_paths=(normal_report.output_path, sensitive_report.output_path, normal_json, sensitive_json),
         item_count=len(normal_sources) + len(sensitive_sources),
         skipped_count=skipped_count,
         excluded_count=sum(1 for item in scanned_items if item.excluded),
@@ -274,6 +298,19 @@ def _write_merge_json(
             excluded_count=sum(1 for item in scanned_items if item.excluded),
             error_skipped_count=error_skipped_count,
             warning_count=len(warnings),
+            rescued_count=sum(1 for item in items if (item.get("merge_recovery") or {}).get("fidelity") not in (None, "exact")),
+            rescued_unit_count=sum(
+                1
+                for item in items
+                for unit in (item.get("merge_recovery") or {}).get("units", [])
+                if unit.get("status") == "merged" and unit.get("fidelity") != "exact"
+            ),
+            skipped_unit_count=sum(
+                1
+                for item in items
+                for unit in (item.get("merge_recovery") or {}).get("units", [])
+                if unit.get("status") == "skipped"
+            ),
         ).dict(),
         "items": build_target_item_groups(
             target_scans,

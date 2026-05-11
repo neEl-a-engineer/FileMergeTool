@@ -60,6 +60,9 @@ class ArtifactSummary(BaseModel):
     skipped_count: int = 0
     error_skipped_count: int = 0
     warning_count: int = 0
+    rescued_count: int = 0
+    rescued_unit_count: int = 0
+    skipped_unit_count: int = 0
 
 
 class WarningItem(BaseModel):

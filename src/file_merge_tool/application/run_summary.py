@@ -7,6 +7,7 @@ from typing import Any
 from file_merge_tool.domain.config import MergeRequest
 from file_merge_tool.domain.result import MergeResult
 from file_merge_tool.domain.extension_selection import effective_selected_extensions
+from file_merge_tool.domain.recovery import recovery_totals
 from file_merge_tool.writers.json_writer import write_json
 
 
@@ -26,16 +27,29 @@ def build_run_summary_payload(
     error_files = [item for item in file_results if item.status == "error"]
     skipped_files = [item for item in file_results if item.status == "skipped"]
     merged_files = [item for item in file_results if item.status == "merged"]
+    recovered_files = [item for item in merged_files if item.recovery and item.recovery.get("fidelity") != "exact"]
+    recovery_counts = recovery_totals(
+        [
+            # recovery_totals expects the recovery payload shape created from RecoveryInfo.
+            # The payload already uses the same keys, so a lightweight dict view is enough here.
+            _recovery_payload_to_info(item.recovery)
+            for item in file_results
+            if item.recovery
+        ]
+    )
     summary_counts = {
         "item_count": result.item_count if result else None,
         "skipped_count": result.skipped_count if result else None,
         "excluded_count": result.excluded_count if result else None,
         "error_skipped_count": result.error_skipped_count if result else None,
         "merged_file_count": len(merged_files),
+        "rescued_file_count": len(recovered_files),
         "skipped_file_count": len(skipped_files),
         "error_file_count": len(error_files),
         "warning_count": len(warnings),
         "generated_output_count": len(outputs),
+        "rescued_unit_count": recovery_counts["rescued_unit_count"],
+        "skipped_unit_count": recovery_counts["skipped_unit_count"],
     }
     return {
         "schema": "file-merge-tool/run-summary/v1",
@@ -86,6 +100,7 @@ def build_run_summary_payload(
                 "exception_type": item.exception_type,
                 "message": item.message,
                 "details": item.details,
+                "recovery": item.recovery,
             }
             for item in file_results
         ],
@@ -117,3 +132,26 @@ def _duration_ms(started_at: str, finished_at: str) -> int | None:
     except ValueError:
         return None
     return max(0, int((finished - started).total_seconds() * 1000))
+
+
+def _recovery_payload_to_info(payload: dict[str, Any]) -> Any:
+    from file_merge_tool.domain.recovery import RecoveryInfo, RecoveryUnit
+
+    units = tuple(
+        RecoveryUnit(
+            unit_type=str(unit.get("unit_type", "")),
+            unit_name=str(unit.get("unit_name", "")),
+            status=str(unit.get("status", "merged")),
+            fidelity=str(unit.get("fidelity", "exact")),
+            message=unit.get("message"),
+            recovery_steps=tuple(unit.get("recovery_steps", ())),
+        )
+        for unit in payload.get("units", [])
+    )
+    return RecoveryInfo(
+        status=str(payload.get("status", "merged")),
+        fidelity=str(payload.get("fidelity", "exact")),
+        message=payload.get("message"),
+        recovery_steps=tuple(payload.get("recovery_steps", ())),
+        units=units,
+    )

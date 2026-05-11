@@ -18,6 +18,14 @@ from file_merge_tool.domain.artifact import (
 )
 from file_merge_tool.domain.config import MergeRequest
 from file_merge_tool.domain.extension_selection import effective_selected_extensions, is_extension_selected
+from file_merge_tool.domain.recovery import (
+    MergeWriteReport,
+    RecoveryInfo,
+    coerce_write_report,
+    combine_recoveries,
+    exact_recovery,
+    recovery_to_dict,
+)
 from file_merge_tool.domain.result import FileResult, MergeResult
 from file_merge_tool.domain.rule_matching import matched_literal_substrings, matched_regex_patterns
 from file_merge_tool.domain.sensitivity import SENSITIVE_MARKERS
@@ -188,6 +196,10 @@ def merge_excel(request: MergeRequest) -> MergeResult:
 
     output_base = _output_base(request)
     outputs: list[Path] = []
+    variant_recoveries: dict[str, dict[str, RecoveryInfo]] = {}
+    variant_items: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    variant_json_paths: dict[tuple[str, str], Path] = {}
+
     for label, mode in ((FORMULA_LABEL, "formula"), (VALUE_LABEL, "value")):
         normal_xlsx = merge_output_path(
             request,
@@ -216,23 +228,51 @@ def merge_excel(request: MergeRequest) -> MergeResult:
             parts=[label],
         )
 
-        write_excel_merge(
-            normal_xlsx,
-            header_lines=_header_lines(request, "normal", normal_sources, skipped_count, warnings, mode),
-            sources=normal_sources,
-            cell_mode=mode,
+        normal_report = coerce_write_report(
+            write_excel_merge(
+                normal_xlsx,
+                header_lines=_header_lines(request, "normal", normal_sources, skipped_count, warnings, mode),
+                sources=normal_sources,
+                cell_mode=mode,
+            ),
+            normal_sources,
         )
-        write_excel_merge(
-            sensitive_xlsx,
-            header_lines=_header_lines(request, "sensitive", sensitive_sources, skipped_count, warnings, mode),
-            sources=sensitive_sources,
-            cell_mode=mode,
+        sensitive_report = coerce_write_report(
+            write_excel_merge(
+                sensitive_xlsx,
+                header_lines=_header_lines(request, "sensitive", sensitive_sources, skipped_count, warnings, mode),
+                sources=sensitive_sources,
+                cell_mode=mode,
+            ),
+            sensitive_sources,
         )
+
+        normal_items, normal_recovery_map = _attach_variant_recovery(normal_sources, normal_report)
+        sensitive_items, sensitive_recovery_map = _attach_variant_recovery(sensitive_sources, sensitive_report)
+        variant_items[(mode, "normal")] = normal_items
+        variant_items[(mode, "sensitive")] = sensitive_items
+        variant_recoveries.setdefault(mode, {}).update(normal_recovery_map)
+        variant_recoveries.setdefault(mode, {}).update(sensitive_recovery_map)
+        variant_json_paths[(mode, "normal")] = normal_json
+        variant_json_paths[(mode, "sensitive")] = sensitive_json
+        outputs.extend((normal_report.output_path, sensitive_report.output_path, normal_json, sensitive_json))
+
+    merged_source_count, additional_skipped, additional_error = _finalize_variant_recoveries(
+        sources=[*normal_sources, *sensitive_sources],
+        file_results=file_results,
+        skipped_items=skipped_items,
+        warnings=warnings,
+        variant_recoveries=variant_recoveries,
+    )
+    skipped_count += additional_skipped
+    error_skipped_count += additional_error
+
+    for mode in ("formula", "value"):
         _write_merge_json(
             request=request,
-            output_path=normal_json,
+            output_path=variant_json_paths[(mode, "normal")],
             classification="normal",
-            items=normal_sources,
+            items=variant_items[(mode, "normal")],
             target_scans=target_scans,
             scanned_items=scanned_items,
             skipped_items=skipped_items,
@@ -243,9 +283,9 @@ def merge_excel(request: MergeRequest) -> MergeResult:
         )
         _write_merge_json(
             request=request,
-            output_path=sensitive_json,
+            output_path=variant_json_paths[(mode, "sensitive")],
             classification="sensitive",
-            items=sensitive_sources,
+            items=variant_items[(mode, "sensitive")],
             target_scans=target_scans,
             scanned_items=scanned_items,
             skipped_items=skipped_items,
@@ -254,11 +294,10 @@ def merge_excel(request: MergeRequest) -> MergeResult:
             error_skipped_count=error_skipped_count,
             cell_mode=mode,
         )
-        outputs.extend((normal_xlsx, sensitive_xlsx, normal_json, sensitive_json))
 
     return MergeResult(
         output_paths=tuple(outputs),
-        item_count=len(normal_sources) + len(sensitive_sources),
+        item_count=merged_source_count,
         skipped_count=skipped_count,
         excluded_count=sum(1 for item in scanned_items if item.excluded),
         error_skipped_count=error_skipped_count,
@@ -281,6 +320,7 @@ def _write_merge_json(
     error_skipped_count: int,
     cell_mode: str,
 ) -> Path:
+    recovery_counts = _recovery_counts_from_items(items)
     payload = {
         "schema": "file-merge-tool/excel-merge-json/v1",
         "header": build_artifact_header(
@@ -296,6 +336,9 @@ def _write_merge_json(
             excluded_count=sum(1 for item in scanned_items if item.excluded),
             error_skipped_count=error_skipped_count,
             warning_count=len(warnings),
+            rescued_count=recovery_counts["rescued_count"],
+            rescued_unit_count=recovery_counts["rescued_unit_count"],
+            skipped_unit_count=recovery_counts["skipped_unit_count"],
         ).dict(),
         "items": build_target_item_groups(
             target_scans,
@@ -321,6 +364,7 @@ def _json_item(item: dict[str, Any], *, cell_mode: str) -> dict[str, Any]:
         "modified_at": item["modified_at"],
         "sheet_count": item["sheet_count"],
         "sensitivity": item["sensitivity"],
+        "merge_recovery": item.get("merge_recovery"),
         "sheets": [
             {
                 "sheet_name": sheet["sheet_name"],
@@ -407,3 +451,136 @@ def _skipped_item(item: Any, reason: str) -> SkippedItem:
         absolute_path=str(item.absolute_path),
         link_target=item.link_target,
     )
+
+
+def _attach_variant_recovery(
+    sources: list[dict[str, Any]],
+    report: MergeWriteReport,
+) -> tuple[list[dict[str, Any]], dict[str, RecoveryInfo]]:
+    recovery_map = report.recovery_map()
+    kept_items: list[dict[str, Any]] = []
+    for source in sources:
+        absolute_path = str(source["absolute_path"])
+        recovery = recovery_map.get(absolute_path) or exact_recovery()
+        payload = dict(source)
+        payload["merge_recovery"] = recovery_to_dict(recovery)
+        if recovery.status == "merged":
+            kept_items.append(payload)
+    return kept_items, recovery_map
+
+
+def _finalize_variant_recoveries(
+    *,
+    sources: list[dict[str, Any]],
+    file_results: list[FileResult],
+    skipped_items: list[SkippedItem],
+    warnings: list[WarningItem],
+    variant_recoveries: dict[str, dict[str, RecoveryInfo]],
+) -> tuple[int, int, int]:
+    merged_source_count = 0
+    skipped_count = 0
+    error_skipped_count = 0
+    for source in sources:
+        absolute_path = str(source["absolute_path"])
+        formula_recovery = variant_recoveries.get("formula", {}).get(absolute_path) or exact_recovery()
+        value_recovery = variant_recoveries.get("value", {}).get(absolute_path) or exact_recovery()
+        combined = combine_recoveries([formula_recovery, value_recovery])
+        recovery_payload = recovery_to_dict(combined)
+        recovery_payload["variants"] = {
+            "formula": recovery_to_dict(formula_recovery),
+            "value": recovery_to_dict(value_recovery),
+        }
+        if combined.status == "skipped":
+            skipped_count += 1
+            error_skipped_count += 1
+            skipped_items.append(
+                SkippedItem(
+                    relative_path=source["relative_path"],
+                    kind="file",
+                    reason="merge_error",
+                    source_target_path=source["source_target_path"],
+                    source_target_kind=source["source_target_kind"],
+                    absolute_path=absolute_path,
+                )
+            )
+            warnings.append(
+                WarningItem(
+                    relative_path=source["relative_path"],
+                    reason="merge_error",
+                    message=combined.message or "The workbook could not be merged into any Excel output variant.",
+                    source_target_path=source["source_target_path"],
+                    source_target_kind=source["source_target_kind"],
+                )
+            )
+            _replace_file_result(
+                file_results,
+                absolute_path=absolute_path,
+                update={
+                    "status": "error",
+                    "skip_reason": "merge_error",
+                    "message": "The workbook could not be merged into any Excel output variant.",
+                    "details": combined.message,
+                    "recovery": recovery_payload,
+                },
+            )
+            continue
+
+        merged_source_count += 1
+        if (
+            combined.fidelity != "exact"
+            or formula_recovery.status == "skipped"
+            or value_recovery.status == "skipped"
+        ):
+            warnings.append(
+                WarningItem(
+                    relative_path=source["relative_path"],
+                    reason="merge_rescued",
+                    message=combined.message or "The workbook was merged with rescue fallback steps.",
+                    source_target_path=source["source_target_path"],
+                    source_target_kind=source["source_target_kind"],
+                )
+            )
+        _replace_file_result(
+            file_results,
+            absolute_path=absolute_path,
+            update={
+                "details": combined.message,
+                "recovery": recovery_payload,
+            },
+        )
+    return merged_source_count, skipped_count, error_skipped_count
+
+
+def _replace_file_result(
+    file_results: list[FileResult],
+    *,
+    absolute_path: str,
+    update: dict[str, Any],
+) -> None:
+    for index, item in enumerate(file_results):
+        if item.source_path != absolute_path:
+            continue
+        payload = item.__dict__.copy()
+        payload.update({key: value for key, value in update.items() if value is not None})
+        file_results[index] = FileResult(**payload)
+        return
+
+
+def _recovery_counts_from_items(items: list[dict[str, Any]]) -> dict[str, int]:
+    rescued_count = 0
+    rescued_unit_count = 0
+    skipped_unit_count = 0
+    for item in items:
+        recovery = item.get("merge_recovery") or {}
+        if recovery.get("fidelity") not in (None, "exact"):
+            rescued_count += 1
+        for unit in recovery.get("units", []):
+            if unit.get("status") == "merged" and unit.get("fidelity") != "exact":
+                rescued_unit_count += 1
+            if unit.get("status") == "skipped":
+                skipped_unit_count += 1
+    return {
+        "rescued_count": rescued_count,
+        "rescued_unit_count": rescued_unit_count,
+        "skipped_unit_count": skipped_unit_count,
+    }

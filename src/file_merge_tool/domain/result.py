@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class FileResult:
     exception_type: str | None = None
     message: str | None = None
     details: str | None = None
+    recovery: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
